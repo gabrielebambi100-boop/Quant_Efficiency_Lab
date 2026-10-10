@@ -19,33 +19,7 @@ Quant Efficiency Lab is an open-source quantitative analysis engine built with P
   * **3-Year Rolling Win Rate:** Evaluates the long-term consistency of the manager's edge.
 
 * **🔬 Quant Laboratory (Statistical):** Provides raw statistical decomposition, Pure Alpha calculations, and monthly return linear regression scatter plots.
-
-## 🚀 Running the App Locally
-
-If you want to run the engine on your local machine, follow these steps:
-
-1. **Clone the repository:**
-
-   ```
-   git clone https://github.com/yourusername/quant-efficiency-lab.git
-   cd quant-efficiency-lab
-   
-   ```
-
-2. **Install the required dependencies:**
-   It is recommended to use a virtual environment.
-
-   ```
-   pip install -r requirements.txt
-   
-   ```
-
-3. **Run the Streamlit app:**
-
-   ```
-   streamlit run quant_efficiency_lab.py
-   
-   ```
+  
 
 ## ⚠️ Limitations & Best Practices
 
