@@ -122,14 +122,13 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         
         weights = style_analysis(f_rets_weekly.values, bench_rets_weekly.values)
         synthetic_bench_rets = np.dot(bench_rets_raw.values, weights)
-        weight_dict = {col: w for col, w in zip(bench_data_df.columns, weights)}
+        # FIX: Manteniamo le chiavi statiche e indipendenti dalla lingua per non rompere l'interfaccia
+        weight_dict = {"Global Equity": weights[0], "Bonds": weights[1], "Cash / Liquidity": weights[2]}
         
         dynamic_rf_rate_daily = bench_rets_raw.iloc[:, 2].mean()
     else:
         synthetic_bench_rets = bench_rets_raw.iloc[:, 0].values
-        weights = np.array([1.0])
-        weight_dict = {bench_data_df.columns[0]: 1.0}
-        
+        weight_dict = {"Global Equity": 1.0, "Bonds": 0.0, "Cash / Liquidity": 0.0}
         dynamic_rf_rate_daily = 0.02 / 252
 
     synthetic_prices = (1 + synthetic_bench_rets).cumprod() * df.iloc[0, 1] 
@@ -147,7 +146,9 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     active_fee = ter / (1 - r_squared) if (1 - r_squared) > 0.01 else 9.99 
     active_return = f_rets - synthetic_bench_rets
     te = active_return.std() * np.sqrt(252)
-    ir = (ann_ret - b_ann_ret) / te if te > 0 else 0
+    
+    # FIX: Blocco matematico per evitare la divisione per zero e i numeri assurdi negli ETF perfetti
+    ir = (ann_ret - b_ann_ret) / te if te > 0.0005 else 0.0
     
     volatility = f_rets.std() * np.sqrt(252)
     sharpe_ratio = (ann_ret - (dynamic_rf_rate_daily * 252)) / volatility if volatility > 0 else 0
@@ -178,10 +179,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     else:
         win_rate = None
     
-    score_num, score_letter, score_verdict = get_global_score(ir, p_value_alpha, down_cap, active_fee, r_squared, ter, win_rate)
-
     return {
-        "Grade Letter": score_letter, "Grade Num": score_num, "Global Verdict": score_verdict,
         "Annualized Return": ann_ret, "TER": ter,
         "Volatility": volatility, "Sharpe Ratio": sharpe_ratio, "Max Drawdown": max_dd,
         "RBSA Weights": weight_dict,
@@ -225,8 +223,8 @@ with st.sidebar:
     st.divider()
     st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
     df_input = pd.DataFrame({
-        "Ticker": ["VT", "AMCPX", "ARKK"],
-        "TER (%)": [0.07, 0.64, 0.75]
+        "Ticker": ["VT", "VDIGX", "AMCPX", "ARKK"],
+        "TER (%)": [0.07, 0.27, 0.74, 0.75]
     })
     edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
@@ -271,9 +269,7 @@ if st.button(t("Run X-Ray Analysis", "Avvia Analisi a Raggi X"), type="primary",
                 st.stop()
                 
             bench_data_df = data[bench_tickers].dropna()
-            if "RBSA" in analysis_mode:
-                bench_data_df.columns = [t("Global Equity", "Azionario Globale"), t("Bonds", "Obbligazionario"), t("Cash / Liquidity", "Liquidità")]
-                
+            
             results = {}
             skipped_funds = []
             
@@ -315,17 +311,23 @@ if "results" in st.session_state:
     selected_t = st.selectbox(t("Select the instrument to inspect:", "Seleziona lo strumento da ispezionare:"), list(res.keys()), format_func=lambda x: f"{names.get(x, x)} ({x})")
     f_data = res[selected_t]
     
-    tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory", "🔬 Laboratorio Quantitativo")])
+    tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory (Statistical)", "🔬 Laboratorio Quantitativo (Statistico)")])
     
     with tab_retail:
-        st.markdown(f"## {t('Global Score', 'Punteggio Globale')}: **{f_data['Grade Letter']}** ({f_data['Grade Num']:.0f}/100)")
+        # FIX: Il calcolo del punteggio ora viene fatto qui, così si traduce dinamicamente al cambio della lingua
+        score_num, score_letter, score_verdict = get_global_score(
+            f_data['Info Ratio'], f_data['P-Value'], f_data['Down Capture'], 
+            f_data['Active Fee Proxy'], f_data['R² vs Benchmark'], f_data['TER'], f_data['Win Rate']
+        )
         
-        box_color = "#1e3a8a" if f_data['Grade Letter'] == "P" else "#052e16" if f_data['Grade Num'] >= 65 else "#451a03" if f_data['Grade Num'] >= 35 else "#450a0a"
-        text_color = "#60a5fa" if f_data['Grade Letter'] == "P" else "#34d399" if f_data['Grade Num'] >= 65 else "#fbbf24" if f_data['Grade Num'] >= 35 else "#f87171"
+        st.markdown(f"## {t('Global Score', 'Punteggio Globale')}: **{score_letter}** ({score_num:.0f}/100)")
+        
+        box_color = "#1e3a8a" if score_letter == "P" else "#052e16" if score_num >= 65 else "#451a03" if score_num >= 35 else "#450a0a"
+        text_color = "#60a5fa" if score_letter == "P" else "#34d399" if score_num >= 65 else "#fbbf24" if score_num >= 35 else "#f87171"
         
         st.markdown(f"""
         <div style="background-color: {box_color}; padding: 15px; border-radius: 10px; border: 1px solid {text_color}; margin-bottom: 25px;">
-            <h4 style="color: {text_color}; margin: 0;">{f_data['Global Verdict']}</h4>
+            <h4 style="color: {text_color}; margin: 0;">{score_verdict}</h4>
         </div>
         """, unsafe_allow_html=True)
         
@@ -333,7 +335,6 @@ if "results" in st.session_state:
         bench_desc = t("its real 'Shadow ETF'", "il suo 'Shadow ETF' reale") if "RBSA" in mode_used else t("your selected benchmark", "il benchmark selezionato")
         st.markdown(t(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}.", f"Dati storici validati dal **{f_data['Analysis Start']}**. Il fondo è stato analizzato contro {bench_desc}."))
         
-        # --- BLOCCO CORE METRICS ---
         st.markdown("---")
         st.markdown(t("### 📊 Absolute Performance", "### 📊 Performance Assoluta"))
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
@@ -348,9 +349,10 @@ if "results" in st.session_state:
         if "RBSA" in mode_used:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
-            w_eq = f_data["RBSA Weights"].get(t("Global Equity", "Azionario Globale"), 0)
-            w_bd = f_data["RBSA Weights"].get(t("Bonds", "Obbligazionario"), 0)
-            w_cs = f_data["RBSA Weights"].get(t("Cash / Liquidity", "Liquidità"), 0)
+            # FIX: Le chiavi ora sono sempre statiche per impedire il bug del 0.0%
+            w_eq = f_data["RBSA Weights"].get("Global Equity", 0)
+            w_bd = f_data["RBSA Weights"].get("Bonds", 0)
+            w_cs = f_data["RBSA Weights"].get("Cash / Liquidity", 0)
             
             col_w1, col_w2, col_w3 = st.columns(3)
             col_w1.metric(t("📈 Equity Weight", "📈 Peso Azionario"), f"{w_eq*100:.1f}%")
@@ -363,7 +365,6 @@ if "results" in st.session_state:
                 st.success(t("✅ **UNCORRELATED:** This instrument operates with an engine profoundly different from standard equities.", "✅ **DECORRELATO:** Questo strumento opera con un motore profondamente diverso dalle classiche azioni."))
                 
         st.markdown("---")
-        # ROW 1 OF METRICS
         c1, c2, c3 = st.columns(3)
         
         icon, title, desc = get_retail_status("Fotocopia", f_data["R² vs Benchmark"])
@@ -388,7 +389,6 @@ if "results" in st.session_state:
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
         st.markdown("---")
-        # ROW 2 OF METRICS
         c4, c5, c6 = st.columns(3)
         
         icon, title, desc = get_retail_status("IR", f_data["Info Ratio"])
@@ -462,7 +462,9 @@ if "results" in st.session_state:
             st.markdown(t("#### Benchmark Composition", "#### Composizione Benchmark"))
             for k, v in f_data["RBSA Weights"].items():
                 if v > 0.01:
-                    st.markdown(f"- **{names.get(k, k)[:20]}**: `{v*100:.1f}%`")
+                    # Rinomina a livello di display in base alla lingua
+                    display_key = t(k, "Azionario Globale" if "Equity" in k else "Obbligazionario" if "Bond" in k else "Liquidità")
+                    st.markdown(f"- **{display_key}**: `{v*100:.1f}%`")
                     
         with c_q2:
             st.markdown(t("#### Econometric Metrics", "#### Metriche Econometriche"))
