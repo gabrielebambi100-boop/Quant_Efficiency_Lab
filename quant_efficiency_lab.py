@@ -22,6 +22,14 @@ def resolve_ticker(query):
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
+# --- LINGUA E TRADUZIONI ---
+with st.sidebar:
+    lang_choice = st.radio("🌐 Language / Lingua", ["🇮🇹 Italiano", "🇬🇧 English"], horizontal=True)
+    is_it = "Italiano" in lang_choice
+
+def t(en, it):
+    return it if is_it else en
+
 # --- CORE MATH & RBSA ---
 def calc_drawdown(wealth_index):
     peak = wealth_index.cummax()
@@ -42,71 +50,64 @@ def style_analysis(fund_rets, factors_rets):
 
 def get_retail_status(metric_name, value):
     if metric_name == "Fotocopia": 
-        if value > 0.85: return "🔴", "Closet Indexer", "It's a clone. Tracks the index but charges active management fees."
-        if value > 0.60: return "🟡", "Hybrid Management", "Deviates partially, but the core engine remains the base index."
-        return "🟢", "Autonomous Fund", "Makes truly distinct choices, justifying active management."
+        if value > 0.85: return "🔴", t("Closet Indexer", "Finto Attivo (Closet Indexer)"), t("It's a clone. Tracks the index but charges active management fees.", "È un clone. Copia l'indice ma fa pagare commissioni da gestione attiva.")
+        if value > 0.60: return "🟡", t("Hybrid Management", "Gestione Ibrida"), t("Deviates partially, but the core engine remains the base index.", "Devia parzialmente, ma il motore principale resta l'indice di base.")
+        return "🟢", t("Autonomous Fund", "Fondo Autonomo"), t("Makes truly distinct choices, justifying active management.", "Compie scelte nettamente distinte, giustificando la gestione attiva.")
     
     if metric_name == "Active_Fee":
-        if value > 0.04: return "🔴", "Disproportionate Cost", "Requires unrealistic skill to recover this fee drag."
-        if value > 0.025: return "🟡", "High Burden", "The active bet is expensive."
-        return "🟢", "Fair Pricing", "You are paying a fair price for the active risk taken."
+        if value > 0.04: return "🔴", t("Disproportionate Cost", "Costo Spropositato"), t("Requires unrealistic skill to recover this fee drag.", "Richiede un'abilità irrealistica per recuperare questa zavorra di costi.")
+        if value > 0.025: return "🟡", t("High Burden", "Fardello Elevato"), t("The active bet is expensive.", "La scommessa attiva è costosa.")
+        return "🟢", t("Fair Pricing", "Prezzo Equo"), t("You are paying a fair price for the active risk taken.", "Stai pagando un prezzo giusto per il rischio attivo che il gestore si prende.")
         
     if metric_name == "IR":
-        if value < 0: return "🔴", "Value Destructor", "Higher volatility than the index and lower returns."
-        if value < 0.5: return "🟡", "Inefficient", "Active risk is not adequately rewarded."
-        return "🟢", "Efficient", "The active bet pays off significantly."
+        if value < 0: return "🔴", t("Value Destructor", "Distruttore di Valore"), t("Higher volatility than the index and lower returns.", "Volatilità più alta dell'indice e rendimenti inferiori.")
+        if value < 0.5: return "🟡", t("Inefficient", "Inefficiente"), t("Active risk is not adequately rewarded.", "Il rischio attivo preso non è adeguatamente ricompensato.")
+        return "🟢", t("Efficient", "Efficiente"), t("The active bet pays off significantly.", "La scommessa attiva ripaga in modo significativo.")
         
     if metric_name == "Airbag":
-        if value > 0.95: return "🔴", "No Airbag", "When it rains, you get just as wet as with a passive ETF."
-        if value > 0.80: return "🟡", "Weak Protection", "Only partially cushions market crashes."
-        return "🟢", "True Protection", "Anti-crisis fund, sharply cuts market drawdowns."
+        if value > 0.95: return "🔴", t("No Airbag", "Nessun Airbag"), t("When it rains, you get just as wet as with a passive ETF.", "Quando piove, ti bagni esattamente come con un ETF passivo.")
+        if value > 0.80: return "🟡", t("Weak Protection", "Protezione Debole"), t("Only partially cushions market crashes.", "Attutisce solo in minima parte i crolli di mercato.")
+        return "🟢", t("True Protection", "Vera Protezione"), t("Anti-crisis fund, sharply cuts market drawdowns.", "Fondo anti-crisi, taglia drasticamente i crolli del mercato.")
         
     if metric_name == "P_Value":
-        if value > 0.10: return "🔴", "Pure Luck", "No mathematical proof that the manager can consistently beat the market."
-        if value <= 0.05: return "🟢", "Solid Skill", "Excellent statistical significance."
-        return "🟡", "Gray Zone", "Positive results, but the doubt of luck persists."
+        if value > 0.10: return "🔴", t("Pure Luck", "Pura Fortuna"), t("No mathematical proof that the manager can consistently beat the market.", "Nessuna prova matematica che il gestore sappia battere il mercato con costanza.")
+        if value <= 0.05: return "🟢", t("Solid Skill", "Abilità Solida"), t("Excellent statistical significance.", "Eccellente significatività statistica.")
+        return "🟡", t("Gray Zone", "Zona Grigia"), t("Positive results, but the doubt of luck persists.", "Risultati positivi, ma resta il dubbio che sia stato un caso.")
         
     if metric_name == "Consistency":
-        if value is None: return "⚪", "Not Enough Data", "Requires at least 3 years of history to calculate rolling win rate."
-        if value > 0.75: return "🟢", "Consistent Winner", "Reliably beats the benchmark across rolling 3-year periods."
-        if value < 0.40: return "🔴", "Chronic Underperformer", "Holding this for 3 years historically results in losing to the index."
-        return "🟡", "Coin Flip", "Chances of beating the index over 3 years are near 50/50."
+        if value is None: return "⚪", t("Not Enough Data", "Dati Insufficienti"), t("Requires at least 3 years of history.", "Richiede almeno 3 anni di storico.")
+        if value > 0.75: return "🟢", t("Consistent Winner", "Vincente Sistematico"), t("Reliably beats the benchmark across rolling 3-year periods.", "Batte sistematicamente il benchmark su orizzonti di 3 anni.")
+        if value < 0.40: return "🔴", t("Chronic Underperformer", "Perdente Cronico"), t("Holding this for 3 years historically results in losing to the index.", "Tenere questo fondo per 3 anni porta storicamente a perdere contro l'indice.")
+        return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    # --- PASSIVE ETF BYPASS ---
     if r_squared > 0.95 and ter <= 0.003:
-        return 85.0, "P", "🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine."
+        return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
     score = 50.0  
     
-    # 1. Base Engine: Information Ratio (Extra ritorno per rischio attivo)
     score += ir * 25 
     
-    # 2. Skill or Luck?
     if p_value > 0.10: score -= 10
     elif p_value <= 0.05: score += 10
     
-    # 3. The Airbag Test
     if down_cap > 1.0: score -= 10
     elif down_cap < 0.80: score += 10
     
-    # 4. Costo dell'implementazione
-    if active_fee > 0.04: 
-        score -= 15 # Penalità pesante, ma superabile dalle performance
+    if active_fee > 0.04: score -= 15 
     
-    # 5. Consistency Test (Il premio al lungo termine)
     if win_rate is not None:
         if win_rate >= 0.70: score += 15
         elif win_rate < 0.40: score -= 15
     
     score = max(0, min(100, score))
     
-    if score >= 80: return score, "S", "🟢 OUTSTANDING: Rare excellence. Fully justifies the fees."
-    if score >= 65: return score, "A", "🟢 GREAT: Generates real, solid, and statistically valid value."
-    if score >= 50: return score, "B", "🟡 FAIR: Does its job, but consider if a passive ETF is cheaper."
-    if score >= 35: return score, "C", "🟠 MEDIOCRE: Inefficient. You are paying for results mostly dictated by chance."
-    if score >= 20: return score, "D", "🔴 POOR: Destroys value, costs too much, and doesn't protect in crashes."
-    return score, "F", "☠️ TOXIC: Sell immediately. Capital bleed guaranteed."
+    if score >= 80: return score, "S", t("🟢 OUTSTANDING: Rare excellence. Fully justifies the fees.", "🟢 ECCELLENTE: Rara eccellenza. Giustifica pienamente le commissioni.")
+    if score >= 65: return score, "A", t("🟢 GREAT: Generates real, solid, and statistically valid value.", "🟢 OTTIMO: Genera valore reale, solido e statisticamente valido.")
+    if score >= 50: return score, "B", t("🟡 FAIR: Does its job, but consider if a passive ETF is cheaper.", "🟡 DISCRETO: Fa il suo lavoro, ma valuta se un ETF passivo ti costerebbe meno.")
+    if score >= 35: return score, "C", t("🟠 MEDIOCRE: Inefficient. You are paying for results mostly dictated by chance.", "🟠 MEDIOCRE: Inefficiente. Paghi caro per risultati spesso dettati dal caso.")
+    if score >= 20: return score, "D", t("🔴 POOR: Destroys value, costs too much, and doesn't protect in crashes.", "🔴 SCARSO: Distrugge valore, costa troppo e non protegge nei crolli.")
+    return score, "F", t("☠️ TOXIC: Sell immediately. Capital bleed guaranteed.", "☠️ TOSSICO: Da vendere subito. Sanguinamento di capitale garantito.")
 
 def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     df = pd.concat([fund_prices, bench_data_df], axis=1).dropna()
@@ -147,8 +148,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     active_return = f_rets - synthetic_bench_rets
     te = active_return.std() * np.sqrt(252)
     ir = (ann_ret - b_ann_ret) / te if te > 0 else 0
-
-    # Calcolo Core Metrics
+    
     volatility = f_rets.std() * np.sqrt(252)
     sharpe_ratio = (ann_ret - (dynamic_rf_rate_daily * 252)) / volatility if volatility > 0 else 0
     f_wealth_index = (1 + f_rets).cumprod()
@@ -161,12 +161,10 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     t_stat_alpha = intercept / se_alpha if se_alpha > 0 else 0
     p_value_alpha = 2 * (1 - stats.t.cdf(np.abs(t_stat_alpha), df=n-2)) if n > 2 else 1.0
     
-    # ... (tutto il codice precedente rimane uguale fino al calcolo del down_cap)
     up_mask = bench_rets_raw.iloc[:, 0] > 0
     down_mask = bench_rets_raw.iloc[:, 0] < 0
     down_cap = (f_rets[down_mask].mean() / bench_rets_raw.iloc[:, 0][down_mask].mean()) if bench_rets_raw.iloc[:, 0][down_mask].mean() < 0 else 0
     
-    # --- SPOSTATO QUI: 3-YEAR ROLLING WIN RATE ---
     f_monthly = f_rets.resample('ME').apply(lambda x: (1+x).prod()-1)
     b_series = pd.Series(synthetic_bench_rets, index=f_rets.index)
     b_monthly = b_series.resample('ME').apply(lambda x: (1+x).prod()-1)
@@ -180,8 +178,8 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     else:
         win_rate = None
     
-    # --- ORA CHIAMIAMO LO SCORE PASSANDO IL WIN RATE ---
     score_num, score_letter, score_verdict = get_global_score(ir, p_value_alpha, down_cap, active_fee, r_squared, ter, win_rate)
+
     return {
         "Grade Letter": score_letter, "Grade Num": score_num, "Global Verdict": score_verdict,
         "Annualized Return": ann_ret, "TER": ter,
@@ -197,46 +195,46 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     }
 
 # --- UI ---
-st.title("🔬 Quant Efficiency Lab")
+st.title(t("🔬 Quant Efficiency Lab", "🔬 Laboratorio di Efficienza Quant"))
 
 with st.sidebar:
-    st.header("⚙️ Analysis Engine")
+    st.header(t("⚙️ Analysis Engine", "⚙️ Motore di Analisi"))
     
-    currency_preset = st.selectbox("Currency / Region Setup", ["🇺🇸 USD (Default - US/Global)", "🇪🇺 EUR (European UCITS)"])
+    currency_preset = st.selectbox(t("Currency / Region Setup", "Valuta / Area Geografica"), ["🇺🇸 USD (Default - US/Global)", "🇪🇺 EUR (European UCITS)"])
     if "USD" in currency_preset:
         def_eq, def_bd, def_cs = "VT", "AGG", "BIL"
     else:
         def_eq, def_bd, def_cs = "EUNL.DE", "DBZB.DE", "XEON.DE"
         
-    analysis_mode = st.radio("Comparison Method:", ["🤖 Shadow ETF (RBSA)", "🎯 Single Benchmark (Direct)"])
+    analysis_mode = st.radio(t("Comparison Method:", "Metodo di Confronto:"), [t("🤖 Shadow ETF (RBSA)", "🤖 Shadow ETF (RBSA Sintetico)"), t("🎯 Single Benchmark (Direct)", "🎯 Benchmark Singolo (Diretto)")])
     
     if "RBSA" in analysis_mode:
-        st.caption("The engine deconstructs the fund and builds a synthetic benchmark.")
-        st.info("ℹ️ **RBSA Constraints:** The model uses constrained optimization to build a realistic, long-only shadow portfolio (weights must be ≥ 0 and sum exactly to 100%).")
-        eq_ticker = st.text_input("Equity Proxy", def_eq)
-        bd_ticker = st.text_input("Bond Proxy", def_bd)
-        cs_ticker = st.text_input("Cash Proxy", def_cs)
+        st.caption(t("The engine deconstructs the fund and builds a synthetic benchmark.", "Il motore decostruisce il fondo e crea un benchmark sintetico su misura."))
+        st.info(t("ℹ️ **RBSA Constraints:** The model uses constrained optimization to build a realistic, long-only shadow portfolio (weights must be ≥ 0 and sum exactly to 100%).", "ℹ️ **Vincoli RBSA:** Il modello utilizza un'ottimizzazione vincolata per costruire un portafoglio ombra long-only realistico (i pesi devono essere ≥ 0 e sommare esattamente al 100%)."))
+        eq_ticker = st.text_input(t("Equity Proxy", "Proxy Azionario"), def_eq)
+        bd_ticker = st.text_input(t("Bond Proxy", "Proxy Obbligazionario"), def_bd)
+        cs_ticker = st.text_input(t("Cash Proxy", "Proxy Liquidità"), def_cs)
         target_bench_tickers = [eq_ticker.strip().upper(), bd_ticker.strip().upper(), cs_ticker.strip().upper()]
     else:
-        st.caption("1-vs-1 Match: Fund against your chosen Index.")
-        single_bench = st.text_input("Direct Benchmark Ticker", def_eq)
+        st.caption(t("1-vs-1 Match: Fund against your chosen Index.", "Scontro 1-vs-1: Il fondo contro l'indice che hai scelto."))
+        single_bench = st.text_input(t("Direct Benchmark Ticker", "Ticker del Benchmark"), def_eq)
         target_bench_tickers = [single_bench.strip().upper()]
 
-    st.caption("📉 *Risk-Free rate is dynamically calculated based on the selected Cash Proxy to reflect different market regimes.*")
+    st.caption(t("📉 *Risk-Free rate is dynamically calculated based on the selected Cash Proxy to reflect different market regimes.*", "📉 *Il tasso Risk-Free è calcolato dinamicamente sulla base del Proxy Liquidità scelto per riflettere i diversi regimi di mercato.*"))
     
     st.divider()
-    st.header("📦 Instruments to Evaluate")
+    st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
     df_input = pd.DataFrame({
-        "Ticker": ["VT", "ARKK", "AMCPX"],
-        "TER (%)": [0.07, 0.75, 0.64]
+        "Ticker": ["VT", "VDIGX", "AMCPX", "ARKK"],
+        "TER (%)": [0.07, 0.27, 0.74, 0.75]
     })
     edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
-if st.button("Run X-Ray Analysis", type="primary", use_container_width=True):
+if st.button(t("Run X-Ray Analysis", "Avvia Analisi a Raggi X"), type="primary", use_container_width=True):
     valid_tickers = edited_df.dropna(subset=["Ticker"]).copy()
     raw_inputs = valid_tickers["Ticker"].str.strip().tolist()
     
-    with st.spinner("Translating ISINs, aligning dates, and running quantitative analysis..."):
+    with st.spinner(t("Translating ISINs, aligning dates, and running quantitative analysis...", "Traduzione ISIN, allineamento date e calcolo quantitativo in corso...")):
         try:
             fund_mapping = {raw: resolve_ticker(raw) for raw in raw_inputs}
             bench_tickers = [resolve_ticker(t) for t in target_bench_tickers]
@@ -245,10 +243,10 @@ if st.button("Run X-Ray Analysis", type="primary", use_container_width=True):
             names_dict = {}
             df_dict = {}
             
-            for t in all_t:
-                temp = yf.download(t, period="max", progress=False)
+            for tk in all_t:
+                temp = yf.download(tk, period="max", progress=False)
                 if not temp.empty:
-                    names_dict[t] = yf.Ticker(t).info.get("longName", t)
+                    names_dict[tk] = yf.Ticker(tk).info.get("longName", tk)
                     if isinstance(temp.columns, pd.MultiIndex):
                         temp.columns = temp.columns.droplevel(1)
                         
@@ -257,24 +255,24 @@ if st.button("Run X-Ray Analysis", type="primary", use_container_width=True):
                     temp.index = temp.index.normalize()
                         
                     if "Adj Close" in temp.columns:
-                        df_dict[t] = temp["Adj Close"].dropna()
+                        df_dict[tk] = temp["Adj Close"].dropna()
                     elif "Close" in temp.columns:
-                        df_dict[t] = temp["Close"].dropna()
+                        df_dict[tk] = temp["Close"].dropna()
                         
             if not df_dict:
-                st.error("❌ No data found. Yahoo Finance is unresponsive or tickers are invalid.")
+                st.error(t("❌ No data found. Yahoo Finance is unresponsive or tickers are invalid.", "❌ Nessun dato trovato. Yahoo Finance non risponde o i ticker non sono validi."))
                 st.stop()
                 
             data = pd.DataFrame(df_dict)
             
-            missing_bench = [t for t in bench_tickers if t not in data.columns]
+            missing_bench = [tk for tk in bench_tickers if tk not in data.columns]
             if missing_bench:
-                st.error(f"❌ Cannot analyze: Yahoo Finance missing benchmark data for {', '.join(missing_bench)}")
+                st.error(t(f"❌ Cannot analyze: Yahoo Finance missing benchmark data for {', '.join(missing_bench)}", f"❌ Impossibile analizzare: dati benchmark mancanti per {', '.join(missing_bench)}"))
                 st.stop()
                 
             bench_data_df = data[bench_tickers].dropna()
             if "RBSA" in analysis_mode:
-                bench_data_df.columns = ["Global Equity", "Bonds", "Cash / Liquidity"]
+                bench_data_df.columns = [t("Global Equity", "Azionario Globale"), t("Bonds", "Obbligazionario"), t("Cash / Liquidity", "Liquidità")]
                 
             results = {}
             skipped_funds = []
@@ -284,7 +282,7 @@ if st.button("Run X-Ray Analysis", type="primary", use_container_width=True):
                 ter = row_ter / 100 if pd.notna(row_ter) else 0.0
                 
                 if t_resolved not in data.columns:
-                    skipped_funds.append(f"**{raw_input}**: ISIN/Ticker not found in Yahoo Finance database.")
+                    skipped_funds.append(f"**{raw_input}**: " + t("ISIN/Ticker not found in Yahoo Finance database.", "ISIN/Ticker non trovato nel database di Yahoo Finance."))
                     continue
                     
                 m = analyze_instrument(data[t_resolved], bench_data_df, ter, mode="RBSA" if "RBSA" in analysis_mode else "Direct")
@@ -293,13 +291,13 @@ if st.button("Run X-Ray Analysis", type="primary", use_container_width=True):
                     results[raw_input] = m
                     names_dict[raw_input] = names_dict.get(t_resolved, t_resolved)
                 else:
-                    skipped_funds.append(f"**{raw_input}**: Time series too short or fragmented (min 1 year required).")
+                    skipped_funds.append(f"**{raw_input}**: " + t("Time series too short or fragmented (min 1 year required).", "Serie storica troppo breve o frammentata (richiesto minimo 1 anno)."))
                     
             if skipped_funds:
-                st.warning("⚠️ **Some instruments were skipped:**\n" + "\n".join([f"- {sf}" for sf in skipped_funds]))
+                st.warning(t("⚠️ **Some instruments were skipped:**\n", "⚠️ **Alcuni strumenti sono stati ignorati:**\n") + "\n".join([f"- {sf}" for sf in skipped_funds]))
                 
             if not results:
-                st.error("No valid instruments for analysis.")
+                st.error(t("No valid instruments for analysis.", "Nessuno strumento valido per l'analisi."))
             else:
                 st.session_state.results = results
                 st.session_state.names = names_dict
@@ -314,13 +312,13 @@ if "results" in st.session_state:
     mode_used = st.session_state.get("mode", "🤖 Shadow ETF (RBSA)")
     
     st.divider()
-    selected_t = st.selectbox("Select the instrument to inspect:", list(res.keys()), format_func=lambda x: f"{names.get(x, x)} ({x})")
+    selected_t = st.selectbox(t("Select the instrument to inspect:", "Seleziona lo strumento da ispezionare:"), list(res.keys()), format_func=lambda x: f"{names.get(x, x)} ({x})")
     f_data = res[selected_t]
     
-    tab_retail, tab_quant = st.tabs(["👨‍💼 Investor Dashboard (Intuitive)", "🔬 Quant Laboratory (Statistical)"])
+    tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory (Statistical)", "🔬 Laboratorio Quantitativo (Statistico)")])
     
     with tab_retail:
-        st.markdown(f"## Global Score: **{f_data['Grade Letter']}** ({f_data['Grade Num']:.0f}/100)")
+        st.markdown(f"## {t('Global Score', 'Punteggio Globale')}: **{f_data['Grade Letter']}** ({f_data['Grade Num']:.0f}/100)")
         
         box_color = "#1e3a8a" if f_data['Grade Letter'] == "P" else "#052e16" if f_data['Grade Num'] >= 65 else "#451a03" if f_data['Grade Num'] >= 35 else "#450a0a"
         text_color = "#60a5fa" if f_data['Grade Letter'] == "P" else "#34d399" if f_data['Grade Num'] >= 65 else "#fbbf24" if f_data['Grade Num'] >= 35 else "#f87171"
@@ -331,38 +329,38 @@ if "results" in st.session_state:
         </div>
         """, unsafe_allow_html=True)
         
-        st.subheader(f"Real-World Performance Profile")
-        bench_desc = "its real 'Shadow ETF'" if "RBSA" in mode_used else "your selected benchmark"
-        st.markdown(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}.")
+        st.subheader(t("Real-World Performance Profile", "Profilo di Performance Reale"))
+        bench_desc = t("its real 'Shadow ETF'", "il suo 'Shadow ETF' reale") if "RBSA" in mode_used else t("your selected benchmark", "il benchmark selezionato")
+        st.markdown(t(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}.", f"Dati storici validati dal **{f_data['Analysis Start']}**. Il fondo è stato analizzato contro {bench_desc}."))
         
         # --- BLOCCO CORE METRICS ---
         st.markdown("---")
-        st.markdown("### 📊 Absolute Performance")
+        st.markdown(t("### 📊 Absolute Performance", "### 📊 Performance Assoluta"))
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        col_m1.metric("Annual Return", f"{f_data['Annualized Return']*100:.1f}%")
-        col_m2.metric("Volatility (Ann)", f"{f_data['Volatility']*100:.1f}%")
+        col_m1.metric(t("Annual Return", "Rendimento Annuo"), f"{f_data['Annualized Return']*100:.1f}%")
+        col_m2.metric(t("Volatility (Ann)", "Volatilità (Annua)"), f"{f_data['Volatility']*100:.1f}%")
         col_m3.metric("Sharpe Ratio", f"{f_data['Sharpe Ratio']:.2f}")
-        col_m4.metric("Max Drawdown", f"{f_data['Max Drawdown']*100:.1f}%")
+        col_m4.metric(t("Max Drawdown", "Max Drawdown (Crollo Max)"), f"{f_data['Max Drawdown']*100:.1f}%")
         
         if len(f_data['F_Rets']) < 252 * 3:
-            st.warning("⚠️ **Short Track Record:** The instrument has less than 3 years of historical data. Statistical metrics like P-Value and Rolling Win Rate may not be fully reliable and could be driven by market noise.")
+            st.warning(t("⚠️ **Short Track Record:** The instrument has less than 3 years of historical data. Statistical metrics like P-Value and Rolling Win Rate may not be fully reliable and could be driven by market noise.", "⚠️ **Track Record Breve:** Lo strumento ha meno di 3 anni di storico. Metriche statistiche come il P-Value e il Win Rate potrebbero non essere affidabili e derivare dal rumore di mercato."))
         
         if "RBSA" in mode_used:
             st.markdown("---")
-            st.markdown("### 🧬 Fund DNA (Under the Hood)")
-            w_eq = f_data["RBSA Weights"].get("Global Equity", 0)
-            w_bd = f_data["RBSA Weights"].get("Bonds", 0)
-            w_cs = f_data["RBSA Weights"].get("Cash / Liquidity", 0)
+            st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
+            w_eq = f_data["RBSA Weights"].get(t("Global Equity", "Azionario Globale"), 0)
+            w_bd = f_data["RBSA Weights"].get(t("Bonds", "Obbligazionario"), 0)
+            w_cs = f_data["RBSA Weights"].get(t("Cash / Liquidity", "Liquidità"), 0)
             
             col_w1, col_w2, col_w3 = st.columns(3)
-            col_w1.metric("📈 Equity Weight", f"{w_eq*100:.1f}%")
-            col_w2.metric("🛡️ Bond Weight", f"{w_bd*100:.1f}%")
-            col_w3.metric("💶 Cash / Liquidity", f"{w_cs*100:.1f}%")
+            col_w1.metric(t("📈 Equity Weight", "📈 Peso Azionario"), f"{w_eq*100:.1f}%")
+            col_w2.metric(t("🛡️ Bond Weight", "🛡️ Peso Obbligazionario"), f"{w_bd*100:.1f}%")
+            col_w3.metric(t("💶 Cash / Liquidity", "💶 Peso Liquidità"), f"{w_cs*100:.1f}%")
             
             if w_eq >= 0.75:
-                st.warning(f"⚠ **WARNING:** This instrument is **{w_eq*100:.0f}%** driven by Global Equities. Do not be fooled by thematic narratives: if global stock markets crash, this fund will crash with them.")
+                st.warning(t(f"⚠ **WARNING:** This instrument is **{w_eq*100:.0f}%** driven by Global Equities. Do not be fooled by thematic narratives: if global stock markets crash, this fund will crash with them.", f"⚠ **ATTENZIONE:** Questo strumento è guidato per il **{w_eq*100:.0f}%** dall'Azionario Globale. Non farti ingannare dalle narrazioni: se le borse crollano, questo fondo crollerà con loro."))
             elif w_eq <= 0.30:
-                st.success("✅ **UNCORRELATED:** This instrument operates with an engine profoundly different from standard equities.")
+                st.success(t("✅ **UNCORRELATED:** This instrument operates with an engine profoundly different from standard equities.", "✅ **DECORRELATO:** Questo strumento opera con un motore profondamente diverso dalle classiche azioni."))
                 
         st.markdown("---")
         # ROW 1 OF METRICS
@@ -370,24 +368,24 @@ if "results" in st.session_state:
         
         icon, title, desc = get_retail_status("Fotocopia", f_data["R² vs Benchmark"])
         with c1:
-            st.markdown(f"### {icon} Index Overlap")
-            st.markdown(f"**How much is this fund copying the market instead of actively managing it?**")
-            st.metric("Correlation to Index", f"{f_data['R² vs Benchmark']*100:.1f}%")
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.markdown(f"### {icon} {t('Index Overlap', 'Sovrapposizione all\'Indice')}")
+            st.markdown(t("**How much is this fund copying the market instead of actively managing it?**", "**Quanto questo fondo copia il mercato invece di gestirlo attivamente?**"))
+            st.metric(t("Correlation to Index", "Correlazione all'Indice"), f"{f_data['R² vs Benchmark']*100:.1f}%")
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
             
         icon, title, desc = get_retail_status("Active_Fee", f_data["Active Fee Proxy"])
         with c2:
-            st.markdown(f"### {icon} Active Fee Proxy")
-            st.markdown(f"**On the truly active portion, what hidden commission rate are you paying?**")
-            st.metric("Estimated Active Fee", f"{f_data['Active Fee Proxy']*100:.1f}%" if f_data['Active Fee Proxy'] < 9 else "> 10%")
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.markdown(f"### {icon} {t('Active Fee Proxy', 'Stima Costo Attivo')}")
+            st.markdown(t("**On the truly active portion, what hidden commission rate are you paying?**", "**Sulla porzione puramente attiva, che commissione nascosta stai pagando?**"))
+            st.metric(t("Estimated Active Fee", "Costo Attivo Stimato"), f"{f_data['Active Fee Proxy']*100:.1f}%" if f_data['Active Fee Proxy'] < 9 else "> 10%")
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
             
         icon, title, desc = get_retail_status("Airbag", f_data["Down Capture"])
         with c3:
-            st.markdown(f"### {icon} The Airbag Test")
-            st.markdown(f"**During market sell-offs, does the fund avoid the crash or fall with everyone else?**")
+            st.markdown(f"### {icon} {t('The Airbag Test', 'Il Test dell\'Airbag')}")
+            st.markdown(t("**During market sell-offs, does the fund avoid the crash or fall with everyone else?**", "**Durante i crolli di mercato, il fondo li evita o cade insieme a tutti gli altri?**"))
             st.metric("Drawdown Capture", f"{f_data['Down Capture']*100:.1f}%")
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
         st.markdown("---")
         # ROW 2 OF METRICS
@@ -395,28 +393,28 @@ if "results" in st.session_state:
         
         icon, title, desc = get_retail_status("IR", f_data["Info Ratio"])
         with c4:
-            st.markdown(f"### {icon} Efficiency Index")
-            st.markdown(f"**For every sleepless night caused by active risk, how much extra return was generated?**")
+            st.markdown(f"### {icon} {t('Efficiency Index', 'Indice di Efficienza')}")
+            st.markdown(t("**For every sleepless night caused by active risk, how much extra return was generated?**", "**Per ogni notte insonne causata dal rischio attivo, quanto extra rendimento è stato generato?**"))
             st.metric("Information Ratio", f"{f_data['Info Ratio']:.2f}")
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
             
         icon, title, desc = get_retail_status("P_Value", f_data["P-Value"])
         with c5:
-            st.markdown(f"### {icon} Skill or Luck?")
-            st.markdown(f"**Probability that the positive performance is just a fortunate coincidence.**")
-            st.metric("Luck Risk (P-Value)", f"{f_data['P-Value']*100:.1f}%")
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.markdown(f"### {icon} {t('Skill or Luck?', 'Abilità o Fortuna?')}")
+            st.markdown(t("**Probability that the positive performance is just a fortunate coincidence.**", "**Probabilità che le performance positive siano solo una fortunata coincidenza.**"))
+            st.metric(t("Luck Risk (P-Value)", "Rischio Fortuna (P-Value)"), f"{f_data['P-Value']*100:.1f}%")
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
             
         icon, title, desc = get_retail_status("Consistency", f_data["Win Rate"])
         with c6:
-            st.markdown(f"### {icon} 3Y Consistency")
-            st.markdown(f"**How often does it beat the market over a 3-year holding period?**")
+            st.markdown(f"### {icon} {t('3Y Consistency', 'Consistenza a 3 Anni')}")
+            st.markdown(t("**How often does it beat the market over a 3-year holding period?**", "**Quante volte batte il mercato se lo tieni in portafoglio per 3 anni?**"))
             val_str = f"{f_data['Win Rate']*100:.1f}%" if f_data["Win Rate"] is not None else "N/A"
-            st.metric("Rolling Win Rate", val_str)
-            st.markdown(f"> **Verdict:** {title}. {desc}")
+            st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
+            st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
         st.markdown("---")
-        st.markdown("### 🎢 Compounding Path & Drawdowns")
+        st.markdown(t("### 🎢 Compounding Path & Drawdowns", "### 🎢 Percorso di Compounding e Drawdown"))
         
         f_wealth = (1 + f_data["F_Rets"]).cumprod()
         b_wealth = (1 + f_data["B_Rets"]).cumprod()
@@ -425,20 +423,20 @@ if "results" in st.session_state:
         b_dd = calc_drawdown(b_wealth)
         
         fig_wealth = go.Figure()
-        fig_wealth.add_trace(go.Scatter(x=f_wealth.index, y=f_wealth, mode='lines', name='Fund', line=dict(color='#34d399', width=2)))
+        fig_wealth.add_trace(go.Scatter(x=f_wealth.index, y=f_wealth, mode='lines', name=t('Fund', 'Fondo'), line=dict(color='#34d399', width=2)))
         fig_wealth.add_trace(go.Scatter(x=b_wealth.index, y=b_wealth, mode='lines', name='Shadow Benchmark', line=dict(color='#9ca3af', width=2, dash='dot')))
-        fig_wealth.update_layout(template="plotly_dark", height=400, title="Growth of 1 Unit", margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".2f")
+        fig_wealth.update_layout(template="plotly_dark", height=400, title=t("Growth of 1 Unit", "Crescita di 1 Unità (Capitale)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".2f")
         st.plotly_chart(fig_wealth, use_container_width=True)
         
         fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name='Fund Drawdown', line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'))
-        fig_dd.add_trace(go.Scatter(x=b_dd.index, y=b_dd, mode='lines', name='Benchmark Drawdown', line=dict(color='#9ca3af', width=1, dash='dot')))
-        fig_dd.update_layout(template="plotly_dark", height=300, title="Underwater Chart (Drawdowns)", margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%")
+        fig_dd.add_trace(go.Scatter(x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name=t('Fund Drawdown', 'Drawdown Fondo'), line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'))
+        fig_dd.add_trace(go.Scatter(x=b_dd.index, y=b_dd, mode='lines', name=t('Benchmark Drawdown', 'Drawdown Benchmark'), line=dict(color='#9ca3af', width=1, dash='dot')))
+        fig_dd.update_layout(template="plotly_dark", height=300, title=t("Underwater Chart (Drawdowns)", "Grafico Underwater (Crolli)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%")
         st.plotly_chart(fig_dd, use_container_width=True)
         
-        st.markdown("### 🔍 The Spread (Relative Wealth)")
-        st.markdown("This graph shows the fund's compounding growth divided by the benchmark's growth. **Pay attention to the slope, not the height.**")
-        st.markdown("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark, cruising on past success.")
+        st.markdown(t("### 🔍 The Spread (Relative Wealth)", "### 🔍 Lo Spread (Ricchezza Relativa)"))
+        st.markdown(t("This graph shows the fund's compounding growth divided by the benchmark's growth. **Pay attention to the slope, not the height.**", "Questo grafico mostra la crescita del fondo divisa per quella del benchmark. **Fai attenzione alla pendenza, non all'altezza.**"))
+        st.markdown(t("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark, cruising on past success.", "- 📈 **Sale:** Il fondo sta creando attivamente extra rendimento.\n- 📉 **Scende:** Il fondo sta bruciando il suo vantaggio.\n- ➖ **Piatta (anche se in alto):** Il fondo ha smesso di generare valore e sta copiando il benchmark, vivendo di rendita sui successi passati."))
         
         relative_wealth = f_wealth / b_wealth
         fig_spread = go.Figure()
@@ -458,18 +456,18 @@ if "results" in st.session_state:
         st.plotly_chart(fig_spread, use_container_width=True)
 
     with tab_quant:
-        st.subheader("Statistical Decomposition and Pure Alpha")
+        st.subheader(t("Statistical Decomposition and Pure Alpha", "Scomposizione Statistica e Alpha Puro"))
         c_q1, c_q2 = st.columns([1, 2])
         with c_q1:
-            st.markdown("#### Benchmark Composition")
+            st.markdown(t("#### Benchmark Composition", "#### Composizione Benchmark"))
             for k, v in f_data["RBSA Weights"].items():
                 if v > 0.01:
                     st.markdown(f"- **{names.get(k, k)[:20]}**: `{v*100:.1f}%`")
                     
         with c_q2:
-            st.markdown("#### Econometric Metrics")
+            st.markdown(t("#### Econometric Metrics", "#### Metriche Econometriche"))
             df_q = pd.DataFrame({
-                "Annualized Return": [f"{f_data['Annualized Return']:.2%}"],
+                t("Annualized Return", "Rendimento Annuo"): [f"{f_data['Annualized Return']:.2%}"],
                 "Pure Alpha (Ann)": [f"{f_data['Alpha (Ann)']:.2%}"],
                 "Info Ratio": [f"{f_data['Info Ratio']:.2f}"],
                 "R² Adjusted": [f"{f_data['R² vs Benchmark']:.2f}"]
@@ -477,10 +475,10 @@ if "results" in st.session_state:
             st.dataframe(df_q, hide_index=True, use_container_width=True)
             
         st.markdown("---")
-        st.markdown("#### 📉 Linear Regression (Monthly Returns)")
-        st.markdown("<small>Scattered points indicate high active risk. The intersection of the red trendline with the vertical axis represents pure monthly Alpha.</small>", unsafe_allow_html=True)
+        st.markdown(t("#### 📉 Linear Regression (Monthly Returns)", "#### 📉 Regressione Lineare (Rendimenti Mensili)"))
+        st.markdown(t("<small>Scattered points indicate high active risk. The intersection of the red trendline with the vertical axis represents pure monthly Alpha.</small>", "<small>Punti molto dispersi indicano alto rischio attivo. L'intersezione della linea rossa con l'asse verticale rappresenta il puro Alpha mensile.</small>"), unsafe_allow_html=True)
         
-        st.info("⚠️ **Note on Non-Linearity:** This linear regression model assumes symmetrical market exposure. The metrics will naturally penalize highly convex strategies (e.g., trend-following managed futures) as inefficient, since these strategies profit mainly during strong market trends, creating convexity during extreme regimes.")
+        st.info(t("⚠️ **Note on Non-Linearity:** This linear regression model assumes symmetrical market exposure. The metrics will naturally penalize highly convex strategies (e.g., trend-following managed futures) as inefficient, since these strategies profit mainly during strong market trends, creating convexity during extreme regimes.", "⚠️ **Nota sulla Non-Linearità:** Questo modello di regressione lineare assume un'esposizione simmetrica. Le metriche penalizzeranno naturalmente le strategie fortemente convesse (es. managed futures) etichettandole come inefficienti, poiché esse generano profitti principalmente durante forti trend di mercato, creando convessità durante i regimi estremi."))
         
         f_monthly = f_data["F_Rets"].resample('ME').apply(lambda x: (1+x).prod()-1)
         b_series = pd.Series(f_data["B_Rets"], index=f_data["F_Rets"].index)
@@ -494,7 +492,7 @@ if "results" in st.session_state:
         
         fig_scatter.add_trace(go.Scatter(
             x=b_monthly, y=f_monthly, 
-            mode='markers', name='Historical Months',
+            mode='markers', name=t('Historical Months', 'Mesi Storici'),
             marker=dict(color='#3B82F6', size=8, opacity=0.7),
             hovertemplate="Benchmark: %{x:.2%}<br>Fund: %{y:.2%}<extra></extra>"
         ))
@@ -507,8 +505,8 @@ if "results" in st.session_state:
         
         fig_scatter.update_layout(
             template="plotly_dark", height=500,
-            xaxis_title="Shadow Benchmark Return",
-            yaxis_title="Fund Return",
+            xaxis_title=t("Shadow Benchmark Return", "Rendimento Shadow Benchmark"),
+            yaxis_title=t("Fund Return", "Rendimento Fondo"),
             xaxis_tickformat=".1%", yaxis_tickformat=".1%",
             margin=dict(t=30, b=10, l=10, r=10),
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
