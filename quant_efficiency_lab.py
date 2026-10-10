@@ -225,8 +225,8 @@ with st.sidebar:
     st.divider()
     st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
     df_input = pd.DataFrame({
-        "Ticker": ["VT", "VDIGX", "AMCPX", "ARKK"],
-        "TER (%)": [0.07, 0.27, 0.74, 0.75]
+        "Ticker": ["VT", "AMCPX", "ARKK"],
+        "TER (%)": [0.07, 0.64, 0.75]
     })
     edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
@@ -315,7 +315,7 @@ if "results" in st.session_state:
     selected_t = st.selectbox(t("Select the instrument to inspect:", "Seleziona lo strumento da ispezionare:"), list(res.keys()), format_func=lambda x: f"{names.get(x, x)} ({x})")
     f_data = res[selected_t]
     
-    tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory (Statistical)", "🔬 Laboratorio Quantitativo (Statistico)")])
+    tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory", "🔬 Laboratorio Quantitativo")])
     
     with tab_retail:
         st.markdown(f"## {t('Global Score', 'Punteggio Globale')}: **{f_data['Grade Letter']}** ({f_data['Grade Num']:.0f}/100)")
