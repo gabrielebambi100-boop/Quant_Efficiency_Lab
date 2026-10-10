@@ -227,8 +227,8 @@ with st.sidebar:
     st.divider()
     st.header("📦 Instruments to Evaluate")
     df_input = pd.DataFrame({
-        "Ticker": ["FCNTX", "ARKK", "AMCPX"],
-        "TER (%)": [0.77, 0.75, 0.74]
+        "Ticker": ["VT", "ARKK", "AMCPX"],
+        "TER (%)": [0.07, 0.75, 0.64]
     })
     edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
