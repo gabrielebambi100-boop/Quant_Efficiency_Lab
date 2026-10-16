@@ -192,7 +192,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     else:
         win_rate = None
     
-    return {
+return {
         "Annualized Return": ann_ret, "TER": ter,
         "Volatility": volatility, "Sharpe Ratio": sharpe_ratio, "Max Drawdown": max_dd,
         "RBSA Weights": weight_dict,
@@ -200,6 +200,8 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         "Alpha (Ann)": alpha_ann, "Info Ratio": ir,
         "P-Value": p_value_alpha, "Down Capture": down_cap,
         "Win Rate": win_rate,
+        # AGGIUNGI QUESTA RIGA QUI SOTTO:
+        "Rolling Alpha": rolling_alpha if len(f_monthly) >= rolling_window else None,
         "Analysis Start": df.index[0].strftime('%Y-%m-%d'),
         "F_Rets": f_rets, 
         "B_Rets": pd.Series(synthetic_bench_rets, index=f_rets.index)
@@ -556,3 +558,61 @@ if "results" in st.session_state:
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         
         st.plotly_chart(fig_scatter, use_container_width=True)
+        # --- ROLLING ALPHA CHART ---
+        st.markdown("---")
+        st.markdown(t("#### 🔄 3-Year Rolling Alpha (Consistency)", "#### 🔄 Alpha Rolling a 3 Anni (Consistenza)"))
+        st.markdown(t("<small>Shows the annualized outperformance over every possible 3-year holding period. Green areas indicate the fund consistently beat the benchmark, red areas indicate underperformance. This completely removes endpoint bias.</small>", "<small>Mostra l'extra-rendimento annualizzato per ogni possibile finestra di 3 anni. Le aree verdi indicano i cicli in cui il fondo ha battuto il benchmark, quelle rosse dove ha sottoperformato. Questo elimina totalmente il bias del punto finale.</small>"), unsafe_allow_html=True)
+
+        rolling_alpha = f_data.get("Rolling Alpha")
+        if rolling_alpha is not None and not rolling_alpha.empty:
+            fig_roll = go.Figure()
+            
+            # Crea l'area verde per l'outperformance e rossa per l'underperformance
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha >= 0),
+                mode='lines', line=dict(color='#34d399', width=0),
+                fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)', name='Outperformance'
+            ))
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha < 0),
+                mode='lines', line=dict(color='#f87171', width=0),
+                fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)', name='Underperformance'
+            ))
+            
+            # Linea bianca centrale per tracciare il percorso
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha,
+                mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
+                hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
+            ))
+            
+            fig_roll.update_layout(
+                template="plotly_dark", height=350,
+                margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=".1%",
+                hovermode="x unified"
+            )
+            fig_roll.add_hline(y=0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.5)")
+            st.plotly_chart(fig_roll, use_container_width=True)
+        else:
+            st.info(t("Not enough historical data to compute 3-Year Rolling Alpha.", "Storico insufficiente per calcolare l'Alpha Rolling a 3 anni."))
+
+        # --- RETURN DISTRIBUTION (HISTOGRAM) ---
+        st.markdown("---")
+        st.markdown(t("#### 📊 Return Distribution (Tails & Skewness)", "#### 📊 Distribuzione dei Rendimenti (Asimmetria e Code)"))
+        st.markdown(t("<small>Visualizes the frequency of monthly returns. A quantitative look at volatility, skewness, and extreme tail risks compared to the shadow index.</small>", "<small>Visualizza la frequenza dei rendimenti mensili. Un'analisi visiva della volatilità, dell'asimmetria e del rischio di code estreme rispetto all'indice ombra.</small>"), unsafe_allow_html=True)
+        
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(
+            x=f_monthly, name=t('Fund', 'Fondo'), marker_color='#34d399', opacity=0.7, nbinsx=50,
+            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
+        ))
+        fig_hist.add_trace(go.Histogram(
+            x=b_monthly, name='Shadow Benchmark', marker_color='#9ca3af', opacity=0.5, nbinsx=50,
+            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
+        ))
+        fig_hist.update_layout(
+            template="plotly_dark", height=350, barmode='overlay',
+            margin=dict(t=10, b=10, l=10, r=10), xaxis_tickformat=".1%",
+            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
