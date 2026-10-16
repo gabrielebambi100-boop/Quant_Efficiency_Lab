@@ -22,19 +22,6 @@ def resolve_ticker(query):
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
-# --- CSS INJECTION (Nasconde elementi di default) ---
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stApp {
-                background-color: #0E1117;
-            }
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
 # --- LINGUA E TRADUZIONI ---
 with st.sidebar:
     lang_choice = st.radio("🌐 Language / Lingua", ["🇮🇹 Italiano", "🇬🇧 English"], horizontal=True)
@@ -200,8 +187,6 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         "Alpha (Ann)": alpha_ann, "Info Ratio": ir,
         "P-Value": p_value_alpha, "Down Capture": down_cap,
         "Win Rate": win_rate,
-        # AGGIUNGI QUESTA RIGA QUI SOTTO:
-        "Rolling Alpha": rolling_alpha if len(f_monthly) >= rolling_window else None,
         "Analysis Start": df.index[0].strftime('%Y-%m-%d'),
         "F_Rets": f_rets, 
         "B_Rets": pd.Series(synthetic_bench_rets, index=f_rets.index)
@@ -429,68 +414,43 @@ if "results" in st.session_state:
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
         st.markdown("---")
-        st.markdown(t("### 🎢 Time Machine & Drawdowns", "### 🎢 Macchina del Tempo (Crescita 10.000€)"))
+        st.markdown(t("### 🎢 Compounding Path & Drawdowns", "### 🎢 Percorso di Compounding e Drawdown"))
         
-        # Crescita moltiplicata per 10.000
-        f_wealth = (1 + f_data["F_Rets"]).cumprod() * 10000
-        b_wealth = (1 + f_data["B_Rets"]).cumprod() * 10000
+        f_wealth = (1 + f_data["F_Rets"]).cumprod()
+        b_wealth = (1 + f_data["B_Rets"]).cumprod()
         
-        # Drawdown calcolati sulle curve normali
-        f_dd = calc_drawdown((1 + f_data["F_Rets"]).cumprod())
-        b_dd = calc_drawdown((1 + f_data["B_Rets"]).cumprod())
+        f_dd = calc_drawdown(f_wealth)
+        b_dd = calc_drawdown(b_wealth)
         
-        # 1. Grafico Ricchezza (Time Machine)
         fig_wealth = go.Figure()
-        fig_wealth.add_trace(go.Scatter(
-            x=f_wealth.index, y=f_wealth, mode='lines', name=t('Fund', 'Fondo'), 
-            line=dict(color='#34d399', width=3),
-            hovertemplate=t("Date: %{x}<br>Value: €%{y:,.0f}<extra></extra>", "Data: %{x}<br>Valore: €%{y:,.0f}<extra></extra>")
-        ))
-        fig_wealth.add_trace(go.Scatter(
-            x=b_wealth.index, y=b_wealth, mode='lines', name='Shadow Benchmark', 
-            line=dict(color='#9ca3af', width=2, dash='dot'), fill='tozeroy', fillcolor='rgba(55, 65, 81, 0.2)',
-            hovertemplate=t("Date: %{x}<br>Value: €%{y:,.0f}<extra></extra>", "Data: %{x}<br>Valore: €%{y:,.0f}<extra></extra>")
-        ))
-        fig_wealth.update_layout(
-            template="plotly_dark", height=400, 
-            margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=",.0f", 
-            hovermode="x unified" # LINEA VERTICALE INTERATTIVA
-        )
+        fig_wealth.add_trace(go.Scatter(x=f_wealth.index, y=f_wealth, mode='lines', name=t('Fund', 'Fondo'), line=dict(color='#34d399', width=2)))
+        fig_wealth.add_trace(go.Scatter(x=b_wealth.index, y=b_wealth, mode='lines', name='Shadow Benchmark', line=dict(color='#9ca3af', width=2, dash='dot')))
+        fig_wealth.update_layout(template="plotly_dark", height=400, title=t("Growth of 1 Unit", "Crescita di 1 Unità (Capitale)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".2f")
         st.plotly_chart(fig_wealth, use_container_width=True)
         
-        # 2. Grafico Crolli (Drawdowns)
         fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(
-            x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name=t('Fund Drawdown', 'Drawdown Fondo'), 
-            line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'
-        ))
-        fig_dd.add_trace(go.Scatter(
-            x=b_dd.index, y=b_dd, mode='lines', name=t('Benchmark Drawdown', 'Drawdown Benchmark'), 
-            line=dict(color='#9ca3af', width=1, dash='dot')
-        ))
-        fig_dd.update_layout(
-            template="plotly_dark", height=300, 
-            title=t("Underwater Chart (Drawdowns)", "Grafico Underwater (Crolli)"), 
-            margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%", 
-            hovermode="x unified"
-        )
+        fig_dd.add_trace(go.Scatter(x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name=t('Fund Drawdown', 'Drawdown Fondo'), line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'))
+        fig_dd.add_trace(go.Scatter(x=b_dd.index, y=b_dd, mode='lines', name=t('Benchmark Drawdown', 'Drawdown Benchmark'), line=dict(color='#9ca3af', width=1, dash='dot')))
+        fig_dd.update_layout(template="plotly_dark", height=300, title=t("Underwater Chart (Drawdowns)", "Grafico Underwater (Crolli)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%")
         st.plotly_chart(fig_dd, use_container_width=True)
         
-        # 3. Grafico Spread Ricchezza Relativa
         st.markdown(t("### 🔍 The Spread (Relative Wealth)", "### 🔍 Lo Spread (Ricchezza Relativa)"))
         st.markdown(t("This graph shows the fund's compounding growth divided by the benchmark's growth. **Pay attention to the slope, not the height.**", "Questo grafico mostra la crescita del fondo divisa per quella del benchmark. **Fai attenzione alla pendenza, non all'altezza.**"))
-        st.markdown(t("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark.", "- 📈 **Sale:** Il fondo sta creando attivamente extra rendimento.\n- 📉 **Scende:** Il fondo sta bruciando il suo vantaggio.\n- ➖ **Piatta (anche se in alto):** Il fondo ha smesso di generare valore e sta copiando il benchmark."))
+        st.markdown(t("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark, cruising on past success.", "- 📈 **Sale:** Il fondo sta creando attivamente extra rendimento.\n- 📉 **Scende:** Il fondo sta bruciando il suo vantaggio.\n- ➖ **Piatta (anche se in alto):** Il fondo ha smesso di generare valore e sta copiando il benchmark, vivendo di rendita sui successi passati."))
         
-        relative_wealth = (1 + f_data["F_Rets"]).cumprod() / (1 + f_data["B_Rets"]).cumprod()
+        relative_wealth = f_wealth / b_wealth
         fig_spread = go.Figure()
         fig_spread.add_trace(go.Scatter(
-            x=relative_wealth.index, y=relative_wealth, mode='lines', name='Relative Edge', 
+            x=relative_wealth.index, 
+            y=relative_wealth, 
+            mode='lines', 
+            name='Relative Edge', 
             line=dict(color='#8b5cf6', width=2)
         ))
         fig_spread.update_layout(
             template="plotly_dark", height=300, 
-            margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=".2f", 
-            hovermode="x unified"
+            margin=dict(t=10, b=10, l=10, r=10), 
+            yaxis_tickformat=".2f"
         )
         fig_spread.add_hline(y=1.0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.3)")
         st.plotly_chart(fig_spread, use_container_width=True)
@@ -558,61 +518,3 @@ if "results" in st.session_state:
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         
         st.plotly_chart(fig_scatter, use_container_width=True)
-        # --- ROLLING ALPHA CHART ---
-        st.markdown("---")
-        st.markdown(t("#### 🔄 3-Year Rolling Alpha (Consistency)", "#### 🔄 Alpha Rolling a 3 Anni (Consistenza)"))
-        st.markdown(t("<small>Shows the annualized outperformance over every possible 3-year holding period. Green areas indicate the fund consistently beat the benchmark, red areas indicate underperformance. This completely removes endpoint bias.</small>", "<small>Mostra l'extra-rendimento annualizzato per ogni possibile finestra di 3 anni. Le aree verdi indicano i cicli in cui il fondo ha battuto il benchmark, quelle rosse dove ha sottoperformato. Questo elimina totalmente il bias del punto finale.</small>"), unsafe_allow_html=True)
-
-        rolling_alpha = f_data.get("Rolling Alpha")
-        if rolling_alpha is not None and not rolling_alpha.empty:
-            fig_roll = go.Figure()
-            
-            # Crea l'area verde per l'outperformance e rossa per l'underperformance
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha >= 0),
-                mode='lines', line=dict(color='#34d399', width=0),
-                fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)', name='Outperformance'
-            ))
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha < 0),
-                mode='lines', line=dict(color='#f87171', width=0),
-                fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)', name='Underperformance'
-            ))
-            
-            # Linea bianca centrale per tracciare il percorso
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha,
-                mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
-                hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
-            ))
-            
-            fig_roll.update_layout(
-                template="plotly_dark", height=350,
-                margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=".1%",
-                hovermode="x unified"
-            )
-            fig_roll.add_hline(y=0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.5)")
-            st.plotly_chart(fig_roll, use_container_width=True)
-        else:
-            st.info(t("Not enough historical data to compute 3-Year Rolling Alpha.", "Storico insufficiente per calcolare l'Alpha Rolling a 3 anni."))
-
-        # --- RETURN DISTRIBUTION (HISTOGRAM) ---
-        st.markdown("---")
-        st.markdown(t("#### 📊 Return Distribution (Tails & Skewness)", "#### 📊 Distribuzione dei Rendimenti (Asimmetria e Code)"))
-        st.markdown(t("<small>Visualizes the frequency of monthly returns. A quantitative look at volatility, skewness, and extreme tail risks compared to the shadow index.</small>", "<small>Visualizza la frequenza dei rendimenti mensili. Un'analisi visiva della volatilità, dell'asimmetria e del rischio di code estreme rispetto all'indice ombra.</small>"), unsafe_allow_html=True)
-        
-        fig_hist = go.Figure()
-        fig_hist.add_trace(go.Histogram(
-            x=f_monthly, name=t('Fund', 'Fondo'), marker_color='#34d399', opacity=0.7, nbinsx=50,
-            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
-        ))
-        fig_hist.add_trace(go.Histogram(
-            x=b_monthly, name='Shadow Benchmark', marker_color='#9ca3af', opacity=0.5, nbinsx=50,
-            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
-        ))
-        fig_hist.update_layout(
-            template="plotly_dark", height=350, barmode='overlay',
-            margin=dict(t=10, b=10, l=10, r=10), xaxis_tickformat=".1%",
-            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
-        )
-        st.plotly_chart(fig_hist, use_container_width=True)
