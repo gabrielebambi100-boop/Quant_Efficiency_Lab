@@ -427,48 +427,6 @@ if "results" in st.session_state:
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
         st.markdown("---")
-        st.markdown(t("### 🎢 Compounding Path & Drawdowns", "### 🎢 Percorso di Compounding e Drawdown"))
-        
-        f_wealth = (1 + f_data["F_Rets"]).cumprod()
-        b_wealth = (1 + f_data["B_Rets"]).cumprod()
-        
-        f_dd = calc_drawdown(f_wealth)
-        b_dd = calc_drawdown(b_wealth)
-        
-        fig_wealth = go.Figure()
-        fig_wealth.add_trace(go.Scatter(x=f_wealth.index, y=f_wealth, mode='lines', name=t('Fund', 'Fondo'), line=dict(color='#34d399', width=2)))
-        fig_wealth.add_trace(go.Scatter(x=b_wealth.index, y=b_wealth, mode='lines', name='Shadow Benchmark', line=dict(color='#9ca3af', width=2, dash='dot')))
-        fig_wealth.update_layout(template="plotly_dark", height=400, title=t("Growth of 1 Unit", "Crescita di 1 Unità (Capitale)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".2f")
-        st.plotly_chart(fig_wealth, use_container_width=True)
-        
-        fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name=t('Fund Drawdown', 'Drawdown Fondo'), line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'))
-        fig_dd.add_trace(go.Scatter(x=b_dd.index, y=b_dd, mode='lines', name=t('Benchmark Drawdown', 'Drawdown Benchmark'), line=dict(color='#9ca3af', width=1, dash='dot')))
-        fig_dd.update_layout(template="plotly_dark", height=300, title=t("Underwater Chart (Drawdowns)", "Grafico Underwater (Crolli)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%")
-        st.plotly_chart(fig_dd, use_container_width=True)
-        
-        st.markdown(t("### 🔍 The Spread (Relative Wealth)", "### 🔍 Lo Spread (Ricchezza Relativa)"))
-        st.markdown(t("This graph shows the fund's compounding growth divided by the benchmark's growth. **Pay attention to the slope, not the height.**", "Questo grafico mostra la crescita del fondo divisa per quella del benchmark. **Fai attenzione alla pendenza, non all'altezza.**"))
-        st.markdown(t("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark, cruising on past success.", "- 📈 **Sale:** Il fondo sta creando attivamente extra rendimento.\n- 📉 **Scende:** Il fondo sta bruciando il suo vantaggio.\n- ➖ **Piatta (anche se in alto):** Il fondo ha smesso di generare valore e sta copiando il benchmark, vivendo di rendita sui successi passati."))
-        
-        relative_wealth = f_wealth / b_wealth
-        fig_spread = go.Figure()
-        fig_spread.add_trace(go.Scatter(
-            x=relative_wealth.index, 
-            y=relative_wealth, 
-            mode='lines', 
-            name='Relative Edge', 
-            line=dict(color='#8b5cf6', width=2)
-        ))
-        fig_spread.update_layout(
-            template="plotly_dark", height=300, 
-            margin=dict(t=10, b=10, l=10, r=10), 
-            yaxis_tickformat=".2f"
-        )
-        fig_spread.add_hline(y=1.0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.3)")
-        st.plotly_chart(fig_spread, use_container_width=True)
-
-        st.markdown("---")
         st.markdown(t("### 🎢 Time Machine & Drawdowns", "### 🎢 Macchina del Tempo (Crescita 10.000€)"))
         
         # Crescita moltiplicata per 10.000
