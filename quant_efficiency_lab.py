@@ -22,6 +22,19 @@ def resolve_ticker(query):
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
+# --- CSS INJECTION (Nasconde elementi di default per un look professionale) ---
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .stApp {
+                background-color: #0E1117;
+            }
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 # --- LINGUA E TRADUZIONI ---
 with st.sidebar:
     lang_choice = st.radio("🌐 Language / Lingua", ["🇮🇹 Italiano", "🇬🇧 English"], horizontal=True)
@@ -81,11 +94,11 @@ def get_retail_status(metric_name, value):
         return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    if r_squared > 0.95 and ter <= 0.003:
+    # Tolleranza 0.80 per gli ETF passivi per ammortizzare i disallineamenti mondiali
+    if r_squared > 0.80 and ter <= 0.005:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
     score = 50.0  
-    
     score += ir * 25 
     
     if p_value > 0.10: score -= 10
@@ -122,9 +135,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         
         weights = style_analysis(f_rets_weekly.values, bench_rets_weekly.values)
         synthetic_bench_rets = np.dot(bench_rets_raw.values, weights)
-        # FIX: Manteniamo le chiavi statiche e indipendenti dalla lingua per non rompere l'interfaccia
         weight_dict = {"Global Equity": weights[0], "Bonds": weights[1], "Cash / Liquidity": weights[2]}
-        
         dynamic_rf_rate_daily = bench_rets_raw.iloc[:, 2].mean()
     else:
         synthetic_bench_rets = bench_rets_raw.iloc[:, 0].values
@@ -147,13 +158,19 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     active_return = f_rets - synthetic_bench_rets
     te = active_return.std() * np.sqrt(252)
     
-    # FIX: Blocco matematico per evitare la divisione per zero e i numeri assurdi negli ETF perfetti
     ir = (ann_ret - b_ann_ret) / te if te > 0.0005 else 0.0
     
     volatility = f_rets.std() * np.sqrt(252)
+    b_volatility = pd.Series(synthetic_bench_rets).std() * np.sqrt(252)
+    
     sharpe_ratio = (ann_ret - (dynamic_rf_rate_daily * 252)) / volatility if volatility > 0 else 0
+    b_sharpe_ratio = (b_ann_ret - (dynamic_rf_rate_daily * 252)) / b_volatility if b_volatility > 0 else 0
+    
     f_wealth_index = (1 + f_rets).cumprod()
     max_dd = calc_drawdown(f_wealth_index).min()
+    
+    b_wealth_index = (1 + pd.Series(synthetic_bench_rets)).cumprod()
+    b_max_dd = calc_drawdown(b_wealth_index).min()
 
     n = len(excess_b)
     resid = excess_f - (intercept + slope * excess_b)
@@ -177,16 +194,28 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         rolling_alpha = (f_roll - b_roll).dropna()
         win_rate = (rolling_alpha > 0).mean()
     else:
+        rolling_alpha = pd.Series(dtype=float)
         win_rate = None
-    
+        
     return {
-        "Annualized Return": ann_ret, "TER": ter,
-        "Volatility": volatility, "Sharpe Ratio": sharpe_ratio, "Max Drawdown": max_dd,
+        "Annualized Return": ann_ret,
+        "Bench Annualized Return": b_ann_ret,
+        "TER": ter,
+        "Volatility": volatility,
+        "Bench Volatility": b_volatility,
+        "Sharpe Ratio": sharpe_ratio,
+        "Bench Sharpe": b_sharpe_ratio,
+        "Max Drawdown": max_dd,
+        "Bench Max DD": b_max_dd,
         "RBSA Weights": weight_dict,
-        "R² vs Benchmark": r_squared, "Active Fee Proxy": active_fee,
-        "Alpha (Ann)": alpha_ann, "Info Ratio": ir,
-        "P-Value": p_value_alpha, "Down Capture": down_cap,
+        "R² vs Benchmark": r_squared, 
+        "Active Fee Proxy": active_fee,
+        "Alpha (Ann)": alpha_ann, 
+        "Info Ratio": ir,
+        "P-Value": p_value_alpha, 
+        "Down Capture": down_cap,
         "Win Rate": win_rate,
+        "Rolling Alpha": rolling_alpha,
         "Analysis Start": df.index[0].strftime('%Y-%m-%d'),
         "F_Rets": f_rets, 
         "B_Rets": pd.Series(synthetic_bench_rets, index=f_rets.index)
@@ -208,7 +237,7 @@ with st.sidebar:
     
     if "RBSA" in analysis_mode:
         st.caption(t("The engine deconstructs the fund and builds a synthetic benchmark.", "Il motore decostruisce il fondo e crea un benchmark sintetico su misura."))
-        st.info(t("ℹ️ **RBSA Constraints:** The model uses constrained optimization to build a realistic, long-only shadow portfolio (weights must be ≥ 0 and sum exactly to 100%).", "ℹ️ **Vincoli RBSA:** Il modello utilizza un'ottimizzazione vincolata per costruire un portafoglio ombra long-only realistico (i pesi devono essere ≥ 0 e sommare esattamente al 100%)."))
+        st.info(t("ℹ️ **RBSA Constraints:** The model uses constrained optimization to build a realistic, long-only shadow portfolio (weights must be ≥ 0 and sum exactly to 100%).", "ℹ️ **Vincoli RBSA:** Il modello utilizza un'ottimizzazione vincolata per costruire un portafoglio ombra long-only realistico (i pesi devono essere ≥ 0 e sommare al 100%)."))
         eq_ticker = st.text_input(t("Equity Proxy", "Proxy Azionario"), def_eq)
         bd_ticker = st.text_input(t("Bond Proxy", "Proxy Obbligazionario"), def_bd)
         cs_ticker = st.text_input(t("Cash Proxy", "Proxy Liquidità"), def_cs)
@@ -219,6 +248,24 @@ with st.sidebar:
         target_bench_tickers = [single_bench.strip().upper()]
 
     st.caption(t("📉 *Risk-Free rate is dynamically calculated based on the selected Cash Proxy to reflect different market regimes.*", "📉 *Il tasso Risk-Free è calcolato dinamicamente sulla base del Proxy Liquidità scelto per riflettere i diversi regimi di mercato.*"))
+    
+    if is_it:
+        with st.expander("📚 Come funziona l'algoritmo (Metodologia RBSA)"):
+            st.markdown("""
+            **Returns-Based Style Analysis (RBSA)** è una tecnica quantitativa introdotta dal premio Nobel William Sharpe. 
+            Il software utilizza l'ottimizzazione quadratica sequenziale (SLSQP) per calcolare il mix esatto di indici passivi (vincolato tra 0% e 100%) che minimizza la varianza dell'errore di tracciamento rispetto al fondo. 
+            - **Active Fee Proxy:** Stima il vero costo percentuale caricato solo sulla parte di portafoglio gestita attivamente ($1 - R^2$).
+            - **P-Value:** Derivato dalla Statistica-T dell'intercetta della regressione (OLS), valuta se l'Alpha prodotto è statisticamente diverso da zero o se è puro rumore.
+            """)
+    else:
+        with st.expander("📚 How the engine works (RBSA Methodology)"):
+            st.markdown("""
+            **Returns-Based Style Analysis (RBSA)** is a quantitative technique introduced by Nobel laureate William Sharpe. 
+            The software uses Sequential Least Squares Programming (SLSQP) to find the exact asset mix (constrained between 0% and 100%) 
+            that minimizes the variance of the tracking error compared to the analyzed fund. 
+            - **Active Fee Proxy:** Calculated by isolating the total expense ratio (TER) strictly on the active share of the portfolio ($1 - R^2$).
+            - **P-Value:** Derived from the T-Statistic of the OLS regression intercept, testing the null hypothesis that Alpha equals zero.
+            """)
     
     st.divider()
     st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
@@ -314,7 +361,6 @@ if "results" in st.session_state:
     tab_retail, tab_quant = st.tabs([t("👨‍💼 Investor Dashboard (Intuitive)", "👨‍💼 Dashboard Investitore (Intuitiva)"), t("🔬 Quant Laboratory (Statistical)", "🔬 Laboratorio Quantitativo (Statistico)")])
     
     with tab_retail:
-        # FIX: Il calcolo del punteggio ora viene fatto qui, così si traduce dinamicamente al cambio della lingua
         score_num, score_letter, score_verdict = get_global_score(
             f_data['Info Ratio'], f_data['P-Value'], f_data['Down Capture'], 
             f_data['Active Fee Proxy'], f_data['R² vs Benchmark'], f_data['TER'], f_data['Win Rate']
@@ -336,12 +382,26 @@ if "results" in st.session_state:
         st.markdown(t(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}.", f"Dati storici validati dal **{f_data['Analysis Start']}**. Il fondo è stato analizzato contro {bench_desc}."))
         
         st.markdown("---")
-        st.markdown(t("### 📊 Absolute Performance", "### 📊 Performance Assoluta"))
+        st.markdown(t("### 📊 Absolute Performance (Fund vs Benchmark)", "### 📊 Performance Assoluta (Fondo vs Benchmark)"))
+        
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        col_m1.metric(t("Annual Return", "Rendimento Annuo"), f"{f_data['Annualized Return']*100:.1f}%")
-        col_m2.metric(t("Volatility (Ann)", "Volatilità (Annua)"), f"{f_data['Volatility']*100:.1f}%")
-        col_m3.metric("Sharpe Ratio", f"{f_data['Sharpe Ratio']:.2f}")
-        col_m4.metric(t("Max Drawdown", "Max Drawdown (Crollo Max)"), f"{f_data['Max Drawdown']*100:.1f}%")
+        
+        # Delta color off to keep the benchmark text strictly informative (gray)
+        col_m1.metric(t("Annual Return", "Rendimento Annuo"), 
+                      f"{f_data['Annualized Return']*100:.1f}%", 
+                      f"Bench: {f_data['Bench Annualized Return']*100:.1f}%", delta_color="off")
+                      
+        col_m2.metric(t("Volatility (Ann)", "Volatilità (Annua)"), 
+                      f"{f_data['Volatility']*100:.1f}%", 
+                      f"Bench: {f_data['Bench Volatility']*100:.1f}%", delta_color="off")
+                      
+        col_m3.metric("Sharpe Ratio", 
+                      f"{f_data['Sharpe Ratio']:.2f}", 
+                      f"Bench: {f_data['Bench Sharpe']:.2f}", delta_color="off")
+                      
+        col_m4.metric(t("Max Drawdown", "Max Drawdown (Crollo Max)"), 
+                      f"{f_data['Max Drawdown']*100:.1f}%", 
+                      f"Bench: {f_data['Bench Max DD']*100:.1f}%", delta_color="off")
         
         if len(f_data['F_Rets']) < 252 * 3:
             st.warning(t("⚠️ **Short Track Record:** The instrument has less than 3 years of historical data. Statistical metrics like P-Value and Rolling Win Rate may not be fully reliable and could be driven by market noise.", "⚠️ **Track Record Breve:** Lo strumento ha meno di 3 anni di storico. Metriche statistiche come il P-Value e il Win Rate potrebbero non essere affidabili e derivare dal rumore di mercato."))
@@ -349,7 +409,6 @@ if "results" in st.session_state:
         if "RBSA" in mode_used:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
-            # FIX: Le chiavi ora sono sempre statiche per impedire il bug del 0.0%
             w_eq = f_data["RBSA Weights"].get("Global Equity", 0)
             w_bd = f_data["RBSA Weights"].get("Bonds", 0)
             w_cs = f_data["RBSA Weights"].get("Cash / Liquidity", 0)
@@ -413,48 +472,6 @@ if "results" in st.session_state:
             st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
 
-        st.markdown("---")
-        st.markdown(t("### 🎢 Compounding Path & Drawdowns", "### 🎢 Percorso di Compounding e Drawdown"))
-        
-        f_wealth = (1 + f_data["F_Rets"]).cumprod()
-        b_wealth = (1 + f_data["B_Rets"]).cumprod()
-        
-        f_dd = calc_drawdown(f_wealth)
-        b_dd = calc_drawdown(b_wealth)
-        
-        fig_wealth = go.Figure()
-        fig_wealth.add_trace(go.Scatter(x=f_wealth.index, y=f_wealth, mode='lines', name=t('Fund', 'Fondo'), line=dict(color='#34d399', width=2)))
-        fig_wealth.add_trace(go.Scatter(x=b_wealth.index, y=b_wealth, mode='lines', name='Shadow Benchmark', line=dict(color='#9ca3af', width=2, dash='dot')))
-        fig_wealth.update_layout(template="plotly_dark", height=400, title=t("Growth of 1 Unit", "Crescita di 1 Unità (Capitale)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".2f")
-        st.plotly_chart(fig_wealth, use_container_width=True)
-        
-        fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(x=f_dd.index, y=f_dd, mode='lines', fill='tozeroy', name=t('Fund Drawdown', 'Drawdown Fondo'), line=dict(color='#f87171', width=1), fillcolor='rgba(248, 113, 113, 0.3)'))
-        fig_dd.add_trace(go.Scatter(x=b_dd.index, y=b_dd, mode='lines', name=t('Benchmark Drawdown', 'Drawdown Benchmark'), line=dict(color='#9ca3af', width=1, dash='dot')))
-        fig_dd.update_layout(template="plotly_dark", height=300, title=t("Underwater Chart (Drawdowns)", "Grafico Underwater (Crolli)"), margin=dict(t=40, b=10, l=10, r=10), yaxis_tickformat=".1%")
-        st.plotly_chart(fig_dd, use_container_width=True)
-        
-        st.markdown(t("### 🔍 The Spread (Relative Wealth)", "### 🔍 Lo Spread (Ricchezza Relativa)"))
-        st.markdown(t("This graph shows the fund's compounding growth divided by the benchmark's growth. **Pay attention to the slope, not the height.**", "Questo grafico mostra la crescita del fondo divisa per quella del benchmark. **Fai attenzione alla pendenza, non all'altezza.**"))
-        st.markdown(t("- 📈 **Rising:** The fund is actively creating extra value.\n- 📉 **Falling:** The fund is bleeding alpha.\n- ➖ **Flat (even if high up):** The fund has stopped adding value and is just mirroring the benchmark, cruising on past success.", "- 📈 **Sale:** Il fondo sta creando attivamente extra rendimento.\n- 📉 **Scende:** Il fondo sta bruciando il suo vantaggio.\n- ➖ **Piatta (anche se in alto):** Il fondo ha smesso di generare valore e sta copiando il benchmark, vivendo di rendita sui successi passati."))
-        
-        relative_wealth = f_wealth / b_wealth
-        fig_spread = go.Figure()
-        fig_spread.add_trace(go.Scatter(
-            x=relative_wealth.index, 
-            y=relative_wealth, 
-            mode='lines', 
-            name='Relative Edge', 
-            line=dict(color='#8b5cf6', width=2)
-        ))
-        fig_spread.update_layout(
-            template="plotly_dark", height=300, 
-            margin=dict(t=10, b=10, l=10, r=10), 
-            yaxis_tickformat=".2f"
-        )
-        fig_spread.add_hline(y=1.0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.3)")
-        st.plotly_chart(fig_spread, use_container_width=True)
-
     with tab_quant:
         st.subheader(t("Statistical Decomposition and Pure Alpha", "Scomposizione Statistica e Alpha Puro"))
         c_q1, c_q2 = st.columns([1, 2])
@@ -462,7 +479,6 @@ if "results" in st.session_state:
             st.markdown(t("#### Benchmark Composition", "#### Composizione Benchmark"))
             for k, v in f_data["RBSA Weights"].items():
                 if v > 0.01:
-                    # Rinomina a livello di display in base alla lingua
                     display_key = t(k, "Azionario Globale" if "Equity" in k else "Obbligazionario" if "Bond" in k else "Liquidità")
                     st.markdown(f"- **{display_key}**: `{v*100:.1f}%`")
                     
@@ -477,10 +493,9 @@ if "results" in st.session_state:
             st.dataframe(df_q, hide_index=True, use_container_width=True)
             
         st.markdown("---")
+        # 1. SCATTER PLOT
         st.markdown(t("#### 📉 Linear Regression (Monthly Returns)", "#### 📉 Regressione Lineare (Rendimenti Mensili)"))
-        st.markdown(t("<small>Scattered points indicate high active risk. The intersection of the red trendline with the vertical axis represents pure monthly Alpha.</small>", "<small>Punti molto dispersi indicano alto rischio attivo. L'intersezione della linea rossa con l'asse verticale rappresenta il puro Alpha mensile.</small>"), unsafe_allow_html=True)
-        
-        st.info(t("⚠️ **Note on Non-Linearity:** This linear regression model assumes symmetrical market exposure. The metrics will naturally penalize highly convex strategies (e.g., trend-following managed futures) as inefficient, since these strategies profit mainly during strong market trends, creating convexity during extreme regimes.", "⚠️ **Nota sulla Non-Linearità:** Questo modello di regressione lineare assume un'esposizione simmetrica. Le metriche penalizzeranno naturalmente le strategie fortemente convesse (es. managed futures) etichettandole come inefficienti, poiché esse generano profitti principalmente durante forti trend di mercato, creando convessità durante i regimi estremi."))
+        st.markdown(t("<small><b>How to read this:</b> This is the fund's fingerprint. If dots form a tight straight line, the fund is just copying the index. Scattered dots mean the manager is making active bets. The red line shows the trend: if it crosses the vertical axis above zero, the manager is creating pure 'Alpha'.</small>", "<small><b>Come leggerlo:</b> Questa è l'impronta digitale del fondo. Se i punti formano una retta stretta, il fondo sta copiando l'indice. Punti sparsi indicano che il gestore fa scommesse attive. La linea rossa indica la tendenza: se incrocia l'asse verticale sopra lo zero, il gestore crea 'Alpha' puro.</small>"), unsafe_allow_html=True)
         
         f_monthly = f_data["F_Rets"].resample('ME').apply(lambda x: (1+x).prod()-1)
         b_series = pd.Series(f_data["B_Rets"], index=f_data["F_Rets"].index)
@@ -491,30 +506,72 @@ if "results" in st.session_state:
         trendline_y = m * trendline_x + b
 
         fig_scatter = go.Figure()
-        
         fig_scatter.add_trace(go.Scatter(
-            x=b_monthly, y=f_monthly, 
-            mode='markers', name=t('Historical Months', 'Mesi Storici'),
-            marker=dict(color='#3B82F6', size=8, opacity=0.7),
-            hovertemplate="Benchmark: %{x:.2%}<br>Fund: %{y:.2%}<extra></extra>"
+            x=b_monthly, y=f_monthly, mode='markers', name=t('Historical Months', 'Mesi Storici'),
+            marker=dict(color='#3B82F6', size=8, opacity=0.7), hovertemplate="Benchmark: %{x:.2%}<br>Fund: %{y:.2%}<extra></extra>"
         ))
-        
         fig_scatter.add_trace(go.Scatter(
-            x=trendline_x, y=trendline_y, 
-            mode='lines', name=f'Regression (Beta: {m:.2f})',
+            x=trendline_x, y=trendline_y, mode='lines', name=f'Regression (Beta: {m:.2f})',
             line=dict(color='#F87171', width=3, dash='dot')
         ))
-        
         fig_scatter.update_layout(
-            template="plotly_dark", height=500,
-            xaxis_title=t("Shadow Benchmark Return", "Rendimento Shadow Benchmark"),
-            yaxis_title=t("Fund Return", "Rendimento Fondo"),
-            xaxis_tickformat=".1%", yaxis_tickformat=".1%",
-            margin=dict(t=30, b=10, l=10, r=10),
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+            template="plotly_dark", height=500, xaxis_title=t("Shadow Benchmark Return", "Rendimento Shadow Benchmark"),
+            yaxis_title=t("Fund Return", "Rendimento Fondo"), xaxis_tickformat=".1%", yaxis_tickformat=".1%",
+            margin=dict(t=30, b=10, l=10, r=10), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
         )
-        
         fig_scatter.add_vline(x=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.3)")
-        
         st.plotly_chart(fig_scatter, use_container_width=True)
+
+        # 2. ROLLING ALPHA CHART
+        st.markdown("---")
+        st.markdown(t("#### 🔄 3-Year Rolling Alpha (Consistency)", "#### 🔄 Alpha Rolling a 3 Anni (Consistenza)"))
+        st.markdown(t("<small><b>How to read this:</b> This answers the question 'If I held the fund for exactly 3 years, would I have beaten the market?'. Green mountains show periods where the manager consistently won. Red valleys show periods where they lost. This removes the illusion of lucky start dates.</small>", "<small><b>Come leggerlo:</b> Risponde alla domanda 'Se avessi tenuto il fondo per 3 anni esatti, avrei battuto il mercato?'. Le montagne verdi mostrano i cicli in cui il gestore ha vinto con costanza. I burroni rossi indicano le sconfitte. Questo elimina totalmente l'illusione ottica di una fortunata data di inizio.</small>"), unsafe_allow_html=True)
+
+        rolling_alpha = f_data.get("Rolling Alpha")
+        if rolling_alpha is not None and not rolling_alpha.empty:
+            fig_roll = go.Figure()
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha >= 0),
+                mode='lines', line=dict(color='#34d399', width=0),
+                fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)', name='Outperformance'
+            ))
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha < 0),
+                mode='lines', line=dict(color='#f87171', width=0),
+                fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)', name='Underperformance'
+            ))
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha,
+                mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
+                hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
+            ))
+            fig_roll.update_layout(
+                template="plotly_dark", height=350,
+                margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=".1%", hovermode="x unified"
+            )
+            fig_roll.add_hline(y=0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.5)")
+            st.plotly_chart(fig_roll, use_container_width=True)
+        else:
+            st.info(t("Not enough historical data to compute 3-Year Rolling Alpha.", "Storico insufficiente per calcolare l'Alpha Rolling a 3 anni."))
+
+        # 3. RETURN DISTRIBUTION (HISTOGRAM)
+        st.markdown("---")
+        st.markdown(t("#### 📊 Return Distribution (Tails & Skewness)", "#### 📊 Distribuzione dei Rendimenti (Asimmetria e Code)"))
+        st.markdown(t("<small><b>How to read this:</b> Imagine putting all past months into 'buckets' based on their returns. A good fund should have fewer months in the extreme left buckets (crashes) and more months on the right side compared to the benchmark.</small>", "<small><b>Come leggerlo:</b> Immagina di mettere tutti i mesi passati in dei 'secchi' in base a quanto hanno reso. Un buon fondo dovrebbe avere meno mesi nei secchi di estrema sinistra (i crolli) e più mesi nella parte destra rispetto al benchmark.</small>"), unsafe_allow_html=True)
+        
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(
+            x=f_monthly, name=t('Fund', 'Fondo'), marker_color='#34d399', opacity=0.7, nbinsx=50,
+            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
+        ))
+        fig_hist.add_trace(go.Histogram(
+            x=b_monthly, name='Shadow Benchmark', marker_color='#9ca3af', opacity=0.5, nbinsx=50,
+            hovertemplate=t("Return: %{x:.1%}<br>Count: %{y}<extra></extra>", "Rendimento: %{x:.1%}<br>Mesi: %{y}<extra></extra>")
+        ))
+        fig_hist.update_layout(
+            template="plotly_dark", height=350, barmode='overlay',
+            margin=dict(t=10, b=10, l=10, r=10), xaxis_tickformat=".1%",
+            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
