@@ -192,7 +192,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     else:
         win_rate = None
     
-return {
+    return {
         "Annualized Return": ann_ret, "TER": ter,
         "Volatility": volatility, "Sharpe Ratio": sharpe_ratio, "Max Drawdown": max_dd,
         "RBSA Weights": weight_dict,
