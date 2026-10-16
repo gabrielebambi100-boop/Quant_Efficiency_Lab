@@ -517,4 +517,4 @@ if "results" in st.session_state:
         fig_scatter.add_vline(x=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         
-        st.plotly_chart(fig_scatter, use_container_width=True
+        st.plotly_chart(fig_scatter, use_container_width=True)
