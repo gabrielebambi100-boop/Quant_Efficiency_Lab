@@ -94,7 +94,6 @@ def get_retail_status(metric_name, value):
         return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    # Tolleranza 0.80 per gli ETF passivi per ammortizzare i disallineamenti mondiali
     if r_squared > 0.80 and ter <= 0.005:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
@@ -221,9 +220,44 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         "B_Rets": pd.Series(synthetic_bench_rets, index=f_rets.index)
     }
 
-# --- UI ---
+# --- UI MAIN PORTION ---
 st.title(t("🔬 Quant Efficiency Lab", "🔬 Laboratorio di Efficienza Quant"))
 
+# --- SEZIONE STRUMENTI AL CENTRO DELLA PAGINA ---
+st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
+
+if is_it:
+    with st.expander("💡 Spunti: Fondi famosi da testare"):
+        st.markdown("""
+        Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
+        * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
+        * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi a gestione attiva storici e con enormi masse in gestione.*
+        * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
+        * 🟡 **I Fondi da Dividendo:** `JEPI` (JPMorgan Equity Premium). *Molto popolari per la strategia basata sulla distribuzione di alte cedole.*
+        """)
+else:
+    with st.expander("💡 Ideas: Famous Funds to test"):
+        st.markdown("""
+        Copy these famous Tickers into the table below to stress-test the algorithm:
+        * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Some of the most capitalized global and US trackers in the world.*
+        * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Historical actively managed funds with massive AUM.*
+        * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *High-volatility funds tied to specific sectors or mega-trends.*
+        * 🟡 **The Dividend Funds:** `JEPI` (JPMorgan Equity Premium). *Highly popular for their high-yield income distribution strategies.*
+        """)
+        
+df_input = pd.DataFrame({
+    "Ticker": ["VT", "ARKK", "JEPI"],
+    "TER (%)": [0.07, 0.75, 0.35]
+})
+edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
+
+if st.button(t("Run X-Ray Analysis", "Avvia Analisi a Raggi X"), type="primary", use_container_width=True):
+    st.session_state.run_analysis = True
+else:
+    if "run_analysis" not in st.session_state:
+        st.session_state.run_analysis = False
+
+# --- SIDEBAR (Solo Impostazioni Tecniche) ---
 with st.sidebar:
     st.header(t("⚙️ Analysis Engine", "⚙️ Motore di Analisi"))
     
@@ -266,36 +300,9 @@ with st.sidebar:
             - **Active Fee Proxy:** Calculated by isolating the total expense ratio (TER) strictly on the active share of the portfolio ($1 - R^2$).
             - **P-Value:** Derived from the T-Statistic of the OLS regression intercept, testing the null hypothesis that Alpha equals zero.
             """)
-    
-    st.divider()
-    st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
-    
-    if is_it:
-        with st.expander("💡 Spunti: Fondi famosi da testare"):
-            st.markdown("""
-            Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
-            * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
-            * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi a gestione attiva storici e con enormi masse in gestione.*
-            * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
-            * 🟡 **I Fondi da Dividendo:** `JEPI` (JPMorgan Equity Premium). *Molto popolari per la strategia basata sulla distribuzione di alte cedole.*
-            """)
-    else:
-        with st.expander("💡 Ideas: Famous Funds to test"):
-            st.markdown("""
-            Copy these famous Tickers into the table below to stress-test the algorithm:
-            * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Some of the most capitalized global and US trackers in the world.*
-            * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Historical actively managed funds with massive AUM.*
-            * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *High-volatility funds tied to specific sectors or mega-trends.*
-            * 🟡 **The Dividend Funds:** `JEPI` (JPMorgan Equity Premium). *Highly popular for their high-yield income distribution strategies.*
-            """)
-            
-    df_input = pd.DataFrame({
-        "Ticker": ["VT", "ARKK", "JEPI"],
-        "TER (%)": [0.07, 0.75, 0.35]
-    })
-    edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
-if st.button(t("Run X-Ray Analysis", "Avvia Analisi a Raggi X"), type="primary", use_container_width=True):
+# --- ESECUZIONE ANALISI E RISULTATI ---
+if st.session_state.run_analysis:
     valid_tickers = edited_df.dropna(subset=["Ticker"]).copy()
     raw_inputs = valid_tickers["Ticker"].str.strip().tolist()
     
