@@ -552,7 +552,6 @@ if "results" in st.session_state:
                 mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
                 hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
             ))
-            ))
             fig_roll.add_trace(go.Scatter(
                 x=rolling_alpha.index, y=rolling_alpha,
                 mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
