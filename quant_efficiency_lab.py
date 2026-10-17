@@ -410,9 +410,10 @@ if "results" in st.session_state:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
             
-            w_eq = f_data["RBSA Weights"].get("Global Equity", 0)
-            w_bd = f_data["RBSA Weights"].get("Bonds", 0)
-            w_cs = f_data["RBSA Weights"].get("Cash / Liquidity", 0)
+            # Estrazione e arrotondamento per distruggere il rumore decimale dell'ottimizzatore
+            w_eq = round(f_data["RBSA Weights"].get("Global Equity", 0), 4)
+            w_bd = round(f_data["RBSA Weights"].get("Bonds", 0), 4)
+            w_cs = round(f_data["RBSA Weights"].get("Cash / Liquidity", 0), 4)
             
             col_dna_text, col_dna_chart = st.columns([1, 1])
             
