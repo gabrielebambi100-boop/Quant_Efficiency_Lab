@@ -531,15 +531,27 @@ if "results" in st.session_state:
         rolling_alpha = f_data.get("Rolling Alpha")
         if rolling_alpha is not None and not rolling_alpha.empty:
             fig_roll = go.Figure()
+            
+            # Traccia Verde: taglia via i valori sotto lo zero appiattendoli sulla linea base
             fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha >= 0),
+                x=rolling_alpha.index, y=rolling_alpha.clip(lower=0), 
                 mode='lines', line=dict(color='#34d399', width=0),
                 fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)', name='Outperformance'
             ))
+            
+            # Traccia Rossa: taglia via i valori sopra lo zero appiattendoli sulla linea base
             fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.where(rolling_alpha < 0),
+                x=rolling_alpha.index, y=rolling_alpha.clip(upper=0), 
                 mode='lines', line=dict(color='#f87171', width=0),
                 fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)', name='Underperformance'
+            ))
+            
+            # (Il resto rimane uguale: la linea bianca traccia il percorso reale)
+            fig_roll.add_trace(go.Scatter(
+                x=rolling_alpha.index, y=rolling_alpha,
+                mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
+                hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
+            ))
             ))
             fig_roll.add_trace(go.Scatter(
                 x=rolling_alpha.index, y=rolling_alpha,
