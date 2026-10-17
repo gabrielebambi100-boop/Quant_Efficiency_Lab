@@ -270,27 +270,25 @@ with st.sidebar:
     st.divider()
     st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
     
-    # --- NUOVA SEZIONE: HALL OF FAME E HALL OF SHAME ---
     if is_it:
         with st.expander("💡 Spunti: Fondi famosi da testare"):
             st.markdown("""
             Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
-            * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker efficienti che dovrebbero ottenere voti altissimi.*
-            * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi enormi e storici. Riescono a giustificare le commissioni?*
-            * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Venduti come il futuro, ma distruggono valore nei drawdown.*
-            * 🟡 **La Trappola dei Dividendi:** `JEPI` (JPMorgan Equity Premium). *Popolarissimo per le cedole, ma efficiente a livello di total return?*
+            * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
+            * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi a gestione attiva storici e con enormi masse in gestione.*
+            * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
+            * 🟡 **I Fondi da Dividendo:** `JEPI` (JPMorgan Equity Premium). *Molto popolari per la strategia basata sulla distribuzione di alte cedole.*
             """)
     else:
         with st.expander("💡 Ideas: Famous Funds to test"):
             st.markdown("""
             Copy these famous Tickers into the table below to stress-test the algorithm:
-            * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Efficient trackers that should score exceptionally well.*
-            * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Massive historical funds. Can they justify their fees?*
-            * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Sold as the future, but watch their extreme drawdown destruction.*
-            * 🟡 **The Dividend Trap:** `JEPI` (JPMorgan Equity Premium). *Hugely popular for income, but is it efficient on a total return basis?*
+            * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Some of the most capitalized global and US trackers in the world.*
+            * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Historical actively managed funds with massive AUM.*
+            * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *High-volatility funds tied to specific sectors or mega-trends.*
+            * 🟡 **The Dividend Funds:** `JEPI` (JPMorgan Equity Premium). *Highly popular for their high-yield income distribution strategies.*
             """)
             
-    # Aggiornata la tabella di default con 3 fondi perfetti per il contrasto
     df_input = pd.DataFrame({
         "Ticker": ["VT", "ARKK", "JEPI"],
         "TER (%)": [0.07, 0.75, 0.35]
@@ -431,7 +429,6 @@ if "results" in st.session_state:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
             
-            # Arrotondamento per pulire i residui dell'ottimizzatore quadratico (previene bug visuali su Plotly)
             w_eq = round(f_data["RBSA Weights"].get("Global Equity", 0), 4)
             w_bd = round(f_data["RBSA Weights"].get("Bonds", 0), 4)
             w_cs = round(f_data["RBSA Weights"].get("Cash / Liquidity", 0), 4)
@@ -511,6 +508,36 @@ if "results" in st.session_state:
             val_str = f"{f_data['Win Rate']*100:.1f}%" if f_data["Win Rate"] is not None else "N/A"
             st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
+
+        st.markdown("---")
+        st.markdown(t("### 📅 Year-by-Year Performance", "### 📅 Performance Anno per Anno"))
+        st.markdown(t("<small>Shows the calendar year returns. A quick way to see if the fund manages to protect capital during crisis years (e.g., 2022) and keep up during bull markets.</small>", "<small>Mostra i rendimenti per anno solare. Un modo rapido per vedere se il fondo protegge il capitale negli anni di crisi (es. 2022) e se tiene il passo nei mercati toro.</small>"), unsafe_allow_html=True)
+        
+        f_yearly = f_data["F_Rets"].resample('YE').apply(lambda x: (1+x).prod()-1)
+        b_series = pd.Series(f_data["B_Rets"], index=f_data["F_Rets"].index)
+        b_yearly = b_series.resample('YE').apply(lambda x: (1+x).prod()-1)
+        
+        years = f_yearly.index.year
+        
+        fig_yearly = go.Figure()
+        fig_yearly.add_trace(go.Bar(
+            x=years, y=f_yearly, name=t('Fund', 'Fondo'),
+            marker_color=np.where(f_yearly >= 0, '#34d399', '#f87171'),
+            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
+        ))
+        fig_yearly.add_trace(go.Bar(
+            x=years, y=b_yearly, name='Shadow Benchmark',
+            marker_color='#9ca3af', opacity=0.6,
+            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
+        ))
+        
+        fig_yearly.update_layout(
+            template="plotly_dark", height=350, barmode='group',
+            margin=dict(t=30, b=10, l=10, r=10), yaxis_tickformat=".1%",
+            xaxis=dict(type='category'), 
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        )
+        st.plotly_chart(fig_yearly, use_container_width=True)
 
     with tab_quant:
         st.subheader(t("Statistical Decomposition and Pure Alpha", "Scomposizione Statistica e Alpha Puro"))
