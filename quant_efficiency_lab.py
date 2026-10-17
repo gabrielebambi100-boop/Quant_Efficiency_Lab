@@ -269,9 +269,31 @@ with st.sidebar:
     
     st.divider()
     st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
+    
+    # --- NUOVA SEZIONE: HALL OF FAME E HALL OF SHAME ---
+    if is_it:
+        with st.expander("💡 Spunti: Fondi famosi da testare"):
+            st.markdown("""
+            Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
+            * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker efficienti che dovrebbero ottenere voti altissimi.*
+            * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi enormi e storici. Riescono a giustificare le commissioni?*
+            * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Venduti come il futuro, ma distruggono valore nei drawdown.*
+            * 🟡 **La Trappola dei Dividendi:** `JEPI` (JPMorgan Equity Premium). *Popolarissimo per le cedole, ma efficiente a livello di total return?*
+            """)
+    else:
+        with st.expander("💡 Ideas: Famous Funds to test"):
+            st.markdown("""
+            Copy these famous Tickers into the table below to stress-test the algorithm:
+            * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Efficient trackers that should score exceptionally well.*
+            * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Massive historical funds. Can they justify their fees?*
+            * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Sold as the future, but watch their extreme drawdown destruction.*
+            * 🟡 **The Dividend Trap:** `JEPI` (JPMorgan Equity Premium). *Hugely popular for income, but is it efficient on a total return basis?*
+            """)
+            
+    # Aggiornata la tabella di default con 3 fondi perfetti per il contrasto
     df_input = pd.DataFrame({
-        "Ticker": ["VT", "AMCPX", "ARKK"],
-        "TER (%)": [0.07, 0.64, 0.75]
+        "Ticker": ["VT", "ARKK", "JEPI"],
+        "TER (%)": [0.07, 0.75, 0.35]
     })
     edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
@@ -386,7 +408,6 @@ if "results" in st.session_state:
         
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         
-        # Delta color off to keep the benchmark text strictly informative (gray)
         col_m1.metric(t("Annual Return", "Rendimento Annuo"), 
                       f"{f_data['Annualized Return']*100:.1f}%", 
                       f"Bench: {f_data['Bench Annualized Return']*100:.1f}%", delta_color="off")
@@ -410,7 +431,7 @@ if "results" in st.session_state:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
             
-            # Estrazione e arrotondamento per distruggere il rumore decimale dell'ottimizzatore
+            # Arrotondamento per pulire i residui dell'ottimizzatore quadratico (previene bug visuali su Plotly)
             w_eq = round(f_data["RBSA Weights"].get("Global Equity", 0), 4)
             w_bd = round(f_data["RBSA Weights"].get("Bonds", 0), 4)
             w_cs = round(f_data["RBSA Weights"].get("Cash / Liquidity", 0), 4)
@@ -418,7 +439,7 @@ if "results" in st.session_state:
             col_dna_text, col_dna_chart = st.columns([1, 1])
             
             with col_dna_text:
-                st.write("") # Spaziatura
+                st.write("") 
                 st.metric(t("📈 Equity Weight", "📈 Peso Azionario"), f"{w_eq*100:.1f}%")
                 st.metric(t("🛡️ Bond Weight", "🛡️ Peso Obbligazionario"), f"{w_bd*100:.1f}%")
                 st.metric(t("💶 Cash / Liquidity", "💶 Peso Liquidità"), f"{w_cs*100:.1f}%")
@@ -438,7 +459,7 @@ if "results" in st.session_state:
                 )])
                 fig_donut.update_layout(
                     template="plotly_dark", height=250, margin=dict(t=10, b=10, l=10, r=10),
-                    showlegend=False, annotations=[dict(text='DNA', x=0.5, y=0.5, font_size=20, showarrow=False)]
+                    showlegend=False, annotations=[dict(text='DNA', x=0.5, y=0.5, font_size=20, showarrow=False, font=dict(color="white"))]
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
                 
@@ -490,38 +511,7 @@ if "results" in st.session_state:
             val_str = f"{f_data['Win Rate']*100:.1f}%" if f_data["Win Rate"] is not None else "N/A"
             st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
-        st.markdown("---")
-        st.markdown(t("### 📅 Year-by-Year Performance", "### 📅 Performance Anno per Anno"))
-        st.markdown(t("<small>Shows the calendar year returns. A quick way to see if the fund manages to protect capital during crisis years (e.g., 2022) and keep up during bull markets.</small>", "<small>Mostra i rendimenti per anno solare. Un modo rapido per vedere se il fondo protegge il capitale negli anni di crisi (es. 2022) e se tiene il passo nei mercati toro.</small>"), unsafe_allow_html=True)
-        
-        # Estrai i rendimenti per anno solare
-        f_yearly = f_data["F_Rets"].resample('YE').apply(lambda x: (1+x).prod()-1)
-        b_series = pd.Series(f_data["B_Rets"], index=f_data["F_Rets"].index)
-        b_yearly = b_series.resample('YE').apply(lambda x: (1+x).prod()-1)
-        
-        # Filtra via l'anno in corso se ha pochissimi giorni per evitare barre minuscole fuorvianti all'inizio
-        years = f_yearly.index.year
-        
-        fig_yearly = go.Figure()
-        fig_yearly.add_trace(go.Bar(
-            x=years, y=f_yearly, name=t('Fund', 'Fondo'),
-            marker_color=np.where(f_yearly >= 0, '#34d399', '#f87171'),
-            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
-        ))
-        fig_yearly.add_trace(go.Bar(
-            x=years, y=b_yearly, name='Shadow Benchmark',
-            marker_color='#9ca3af', opacity=0.6,
-            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
-        ))
-        
-        fig_yearly.update_layout(
-            template="plotly_dark", height=350, barmode='group',
-            margin=dict(t=30, b=10, l=10, r=10), yaxis_tickformat=".1%",
-            xaxis=dict(type='category'), # Forza l'asse X a mostrare gli anni come etichette fisse
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-        )
-        st.plotly_chart(fig_yearly, use_container_width=True)
-        
+
     with tab_quant:
         st.subheader(t("Statistical Decomposition and Pure Alpha", "Scomposizione Statistica e Alpha Puro"))
         c_q1, c_q2 = st.columns([1, 2])
@@ -543,7 +533,6 @@ if "results" in st.session_state:
             st.dataframe(df_q, hide_index=True, use_container_width=True)
             
         st.markdown("---")
-        # 1. SCATTER PLOT
         st.markdown(t("#### 📉 Linear Regression (Monthly Returns)", "#### 📉 Regressione Lineare (Rendimenti Mensili)"))
         st.markdown(t("<small><b>How to read this:</b> This is the fund's fingerprint. If dots form a tight straight line, the fund is just copying the index. Scattered dots mean the manager is making active bets. The red line shows the trend: if it crosses the vertical axis above zero, the manager is creating pure 'Alpha'.</small>", "<small><b>Come leggerlo:</b> Questa è l'impronta digitale del fondo. Se i punti formano una retta stretta, il fondo sta copiando l'indice. Punti sparsi indicano che il gestore fa scommesse attive. La linea rossa indica la tendenza: se incrocia l'asse verticale sopra lo zero, il gestore crea 'Alpha' puro.</small>"), unsafe_allow_html=True)
         
@@ -573,7 +562,6 @@ if "results" in st.session_state:
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.3)")
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-        # 2. ROLLING ALPHA CHART
         st.markdown("---")
         st.markdown(t("#### 🔄 3-Year Rolling Alpha (Consistency)", "#### 🔄 Alpha Rolling a 3 Anni (Consistenza)"))
         st.markdown(t("<small><b>How to read this:</b> This answers the question 'If I held the fund for exactly 3 years, would I have beaten the market?'. Green mountains show periods where the manager consistently won. Red valleys show periods where they lost. This removes the illusion of lucky start dates.</small>", "<small><b>Come leggerlo:</b> Risponde alla domanda 'Se avessi tenuto il fondo per 3 anni esatti, avrei battuto il mercato?'. Le montagne verdi mostrano i cicli in cui il gestore ha vinto con costanza. I burroni rossi indicano le sconfitte. Questo elimina totalmente l'illusione ottica di una fortunata data di inizio.</small>"), unsafe_allow_html=True)
@@ -581,26 +569,15 @@ if "results" in st.session_state:
         rolling_alpha = f_data.get("Rolling Alpha")
         if rolling_alpha is not None and not rolling_alpha.empty:
             fig_roll = go.Figure()
-            
-            # Traccia Verde: taglia via i valori sotto lo zero appiattendoli sulla linea base
             fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.clip(lower=0), 
+                x=rolling_alpha.index, y=rolling_alpha.clip(lower=0),
                 mode='lines', line=dict(color='#34d399', width=0),
                 fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)', name='Outperformance'
             ))
-            
-            # Traccia Rossa: taglia via i valori sopra lo zero appiattendoli sulla linea base
             fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.clip(upper=0), 
+                x=rolling_alpha.index, y=rolling_alpha.clip(upper=0),
                 mode='lines', line=dict(color='#f87171', width=0),
                 fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)', name='Underperformance'
-            ))
-            
-            # (Il resto rimane uguale: la linea bianca traccia il percorso reale)
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha,
-                mode='lines', line=dict(color='#ffffff', width=1.5), showlegend=False,
-                hovertemplate=t("Date: %{x}<br>Rolling Alpha: %{y:.2%}<extra></extra>", "Data: %{x}<br>Alpha Rolling: %{y:.2%}<extra></extra>")
             ))
             fig_roll.add_trace(go.Scatter(
                 x=rolling_alpha.index, y=rolling_alpha,
@@ -616,7 +593,6 @@ if "results" in st.session_state:
         else:
             st.info(t("Not enough historical data to compute 3-Year Rolling Alpha.", "Storico insufficiente per calcolare l'Alpha Rolling a 3 anni."))
 
-        # 3. RETURN DISTRIBUTION (HISTOGRAM)
         st.markdown("---")
         st.markdown(t("#### 📊 Return Distribution (Tails & Skewness)", "#### 📊 Distribuzione dei Rendimenti (Asimmetria e Code)"))
         st.markdown(t("<small><b>How to read this:</b> Imagine putting all past months into 'buckets' based on their returns. A good fund should have fewer months in the extreme left buckets (crashes) and more months on the right side compared to the benchmark.</small>", "<small><b>Come leggerlo:</b> Immagina di mettere tutti i mesi passati in dei 'secchi' in base a quanto hanno reso. Un buon fondo dovrebbe avere meno mesi nei secchi di estrema sinistra (i crolli) e più mesi nella parte destra rispetto al benchmark.</small>"), unsafe_allow_html=True)
