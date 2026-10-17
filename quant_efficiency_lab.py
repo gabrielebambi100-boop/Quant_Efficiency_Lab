@@ -409,19 +409,37 @@ if "results" in st.session_state:
         if "RBSA" in mode_used:
             st.markdown("---")
             st.markdown(t("### 🧬 Fund DNA (Under the Hood)", "### 🧬 DNA del Fondo (Sotto il Cofano)"))
+            
             w_eq = f_data["RBSA Weights"].get("Global Equity", 0)
             w_bd = f_data["RBSA Weights"].get("Bonds", 0)
             w_cs = f_data["RBSA Weights"].get("Cash / Liquidity", 0)
             
-            col_w1, col_w2, col_w3 = st.columns(3)
-            col_w1.metric(t("📈 Equity Weight", "📈 Peso Azionario"), f"{w_eq*100:.1f}%")
-            col_w2.metric(t("🛡️ Bond Weight", "🛡️ Peso Obbligazionario"), f"{w_bd*100:.1f}%")
-            col_w3.metric(t("💶 Cash / Liquidity", "💶 Peso Liquidità"), f"{w_cs*100:.1f}%")
+            col_dna_text, col_dna_chart = st.columns([1, 1])
             
-            if w_eq >= 0.75:
-                st.warning(t(f"⚠ **WARNING:** This instrument is **{w_eq*100:.0f}%** driven by Global Equities. Do not be fooled by thematic narratives: if global stock markets crash, this fund will crash with them.", f"⚠ **ATTENZIONE:** Questo strumento è guidato per il **{w_eq*100:.0f}%** dall'Azionario Globale. Non farti ingannare dalle narrazioni: se le borse crollano, questo fondo crollerà con loro."))
-            elif w_eq <= 0.30:
-                st.success(t("✅ **UNCORRELATED:** This instrument operates with an engine profoundly different from standard equities.", "✅ **DECORRELATO:** Questo strumento opera con un motore profondamente diverso dalle classiche azioni."))
+            with col_dna_text:
+                st.write("") # Spaziatura
+                st.metric(t("📈 Equity Weight", "📈 Peso Azionario"), f"{w_eq*100:.1f}%")
+                st.metric(t("🛡️ Bond Weight", "🛡️ Peso Obbligazionario"), f"{w_bd*100:.1f}%")
+                st.metric(t("💶 Cash / Liquidity", "💶 Peso Liquidità"), f"{w_cs*100:.1f}%")
+                
+                if w_eq >= 0.75:
+                    st.warning(t(f"⚠ **WARNING:** This instrument is **{w_eq*100:.0f}%** driven by Global Equities. Do not be fooled by thematic narratives: if global stock markets crash, this fund will crash with them.", f"⚠ **ATTENZIONE:** Questo strumento è guidato per il **{w_eq*100:.0f}%** dall'Azionario Globale. Non farti ingannare dalle narrazioni: se le borse crollano, questo fondo crollerà con loro."))
+                elif w_eq <= 0.30:
+                    st.success(t("✅ **UNCORRELATED:** This instrument operates with an engine profoundly different from standard equities.", "✅ **DECORRELATO:** Questo strumento opera con un motore profondamente diverso dalle classiche azioni."))
+            
+            with col_dna_chart:
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=[t("Equity", "Azioni"), t("Bonds", "Obbligazioni"), t("Cash", "Liquidità")],
+                    values=[w_eq, w_bd, w_cs],
+                    hole=.6,
+                    marker_colors=['#3B82F6', '#8B5CF6', '#10B981'],
+                    hovertemplate="%{label}: %{value:.1%}<extra></extra>"
+                )])
+                fig_donut.update_layout(
+                    template="plotly_dark", height=250, margin=dict(t=10, b=10, l=10, r=10),
+                    showlegend=False, annotations=[dict(text='DNA', x=0.5, y=0.5, font_size=20, showarrow=False)]
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
                 
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
@@ -471,7 +489,38 @@ if "results" in st.session_state:
             val_str = f"{f_data['Win Rate']*100:.1f}%" if f_data["Win Rate"] is not None else "N/A"
             st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
-
+        st.markdown("---")
+        st.markdown(t("### 📅 Year-by-Year Performance", "### 📅 Performance Anno per Anno"))
+        st.markdown(t("<small>Shows the calendar year returns. A quick way to see if the fund manages to protect capital during crisis years (e.g., 2022) and keep up during bull markets.</small>", "<small>Mostra i rendimenti per anno solare. Un modo rapido per vedere se il fondo protegge il capitale negli anni di crisi (es. 2022) e se tiene il passo nei mercati toro.</small>"), unsafe_allow_html=True)
+        
+        # Estrai i rendimenti per anno solare
+        f_yearly = f_data["F_Rets"].resample('YE').apply(lambda x: (1+x).prod()-1)
+        b_series = pd.Series(f_data["B_Rets"], index=f_data["F_Rets"].index)
+        b_yearly = b_series.resample('YE').apply(lambda x: (1+x).prod()-1)
+        
+        # Filtra via l'anno in corso se ha pochissimi giorni per evitare barre minuscole fuorvianti all'inizio
+        years = f_yearly.index.year
+        
+        fig_yearly = go.Figure()
+        fig_yearly.add_trace(go.Bar(
+            x=years, y=f_yearly, name=t('Fund', 'Fondo'),
+            marker_color=np.where(f_yearly >= 0, '#34d399', '#f87171'),
+            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
+        ))
+        fig_yearly.add_trace(go.Bar(
+            x=years, y=b_yearly, name='Shadow Benchmark',
+            marker_color='#9ca3af', opacity=0.6,
+            hovertemplate=t("Year: %{x}<br>Return: %{y:.1%}<extra></extra>", "Anno: %{x}<br>Rendimento: %{y:.1%}<extra></extra>")
+        ))
+        
+        fig_yearly.update_layout(
+            template="plotly_dark", height=350, barmode='group',
+            margin=dict(t=30, b=10, l=10, r=10), yaxis_tickformat=".1%",
+            xaxis=dict(type='category'), # Forza l'asse X a mostrare gli anni come etichette fisse
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        )
+        st.plotly_chart(fig_yearly, use_container_width=True)
+        
     with tab_quant:
         st.subheader(t("Statistical Decomposition and Pure Alpha", "Scomposizione Statistica e Alpha Puro"))
         c_q1, c_q2 = st.columns([1, 2])
