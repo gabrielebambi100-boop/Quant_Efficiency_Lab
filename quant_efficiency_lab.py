@@ -16,9 +16,9 @@ def resolve_ticker(query):
         data = res.json()
         if 'quotes' in data and len(data['quotes']) > 0:
             return data['quotes'][0]['symbol']
-    except:
-        pass
-    return query 
+    except Exception as e:
+        print(f"Errore risoluzione ticker {query}: {e}")
+    return query
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
@@ -149,10 +149,13 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     excess_f = f_rets - dynamic_rf_rate_daily
     excess_b = synthetic_bench_rets - dynamic_rf_rate_daily
     
-    slope, intercept, r_value, _, _ = stats.linregress(excess_b, excess_f)
+    # Esecuzione regressione lineare OLS tramite SciPy
+    reg_result = stats.linregress(excess_b, excess_f)
+    slope = reg_result.slope
+    intercept = reg_result.intercept
     alpha_ann = intercept * 252
-    r_squared = r_value**2
-    
+    r_squared = reg_result.rvalue**2
+
     active_fee = ter / (1 - r_squared) if (1 - r_squared) > 0.01 else 9.99 
     active_return = f_rets - synthetic_bench_rets
     te = active_return.std() * np.sqrt(252)
@@ -171,12 +174,13 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     b_wealth_index = (1 + pd.Series(synthetic_bench_rets)).cumprod()
     b_max_dd = calc_drawdown(b_wealth_index).min()
 
+    # Calcolo P-Value dell'intercetta (Alpha) sfruttando l'errore standard nativo di SciPy
     n = len(excess_b)
-    resid = excess_f - (intercept + slope * excess_b)
-    s2_e = np.sum(resid**2) / (n - 2) if n > 2 else 0
-    se_alpha = np.sqrt(s2_e * (1/n + np.mean(excess_b)**2 / np.sum((excess_b - np.mean(excess_b))**2))) if s2_e > 0 else 0
-    t_stat_alpha = intercept / se_alpha if se_alpha > 0 else 0
-    p_value_alpha = 2 * (1 - stats.t.cdf(np.abs(t_stat_alpha), df=n-2)) if n > 2 else 1.0
+    if hasattr(reg_result, 'intercept_stderr') and reg_result.intercept_stderr > 0:
+        t_stat_alpha = intercept / reg_result.intercept_stderr
+        p_value_alpha = 2 * (1 - stats.t.cdf(np.abs(t_stat_alpha), df=n-2))
+    else:
+        p_value_alpha = 1.0
     
     up_mask = bench_rets_raw.iloc[:, 0] > 0
     down_mask = bench_rets_raw.iloc[:, 0] < 0
