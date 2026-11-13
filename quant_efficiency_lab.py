@@ -16,9 +16,9 @@ def resolve_ticker(query):
         data = res.json()
         if 'quotes' in data and len(data['quotes']) > 0:
             return data['quotes'][0]['symbol']
-    except:
-        pass
-    return query 
+    except Exception as e:
+        print(f"Errore risoluzione ticker {query}: {e}")
+    return query
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
@@ -94,8 +94,7 @@ def get_retail_status(metric_name, value):
         return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    # FIX TER: Il massimo accettato per essere considerato PASSIVO è lo 0.50% (0.005)
-    if r_squared > 0.80 and ter <= 0.005:
+    if r_squared > 0.80 and ter <= 0.02:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
     score = 50.0  
@@ -234,7 +233,7 @@ st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
 if is_it:
     with st.expander("💡 Spunti: Fondi famosi da testare"):
         st.markdown("""
-        Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo (il TER viene cercato in automatico):
+        Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
         * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
         * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi a gestione attiva storici e con enormi masse in gestione.*
         * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
@@ -243,16 +242,16 @@ if is_it:
 else:
     with st.expander("💡 Ideas: Famous Funds to test"):
         st.markdown("""
-        Copy these famous Tickers into the table below to stress-test the algorithm (TER is fetched automatically):
+        Copy these famous Tickers into the table below to stress-test the algorithm:
         * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Some of the most capitalized global and US trackers in the world.*
         * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Historical actively managed funds with massive AUM.*
         * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *High-volatility funds tied to specific sectors or mega-trends.*
         * 🟡 **The Dividend Funds:** `JEPI` (JPMorgan Equity Premium). *Highly popular for their high-yield income distribution strategies.*
         """)
         
-# TABELLA MODIFICATA: L'UTENTE INSERISCE SOLO IL TICKER
 df_input = pd.DataFrame({
-    "Ticker": ["VT", "AMCPX", "ARKK", "JEPI"]
+    "Ticker": ["VT", "ARKK", "JEPI"],
+    "TER (%)": [0.07, 0.75, 0.35]
 })
 edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
@@ -311,7 +310,7 @@ if st.session_state.run_analysis:
     valid_tickers = edited_df.dropna(subset=["Ticker"]).copy()
     raw_inputs = valid_tickers["Ticker"].str.strip().tolist()
     
-    with st.spinner(t("Translating ISINs, fetching TERs, and running quantitative analysis...", "Ricerca Ticker, estrazione TER e calcolo quantitativo in corso...")):
+    with st.spinner(t("Translating ISINs, aligning dates, and running quantitative analysis...", "Traduzione ISIN, allineamento date e calcolo quantitativo in corso...")):
         try:
             fund_mapping = {raw: resolve_ticker(raw) for raw in raw_inputs}
             bench_tickers = [resolve_ticker(t) for t in target_bench_tickers]
@@ -319,23 +318,11 @@ if st.session_state.run_analysis:
             all_t = list(set(list(fund_mapping.values()) + bench_tickers))
             names_dict = {}
             df_dict = {}
-            ter_dict = {} # Nuovo dizionario per immagazzinare i TER trovati in automatico
             
             for tk in all_t:
-                tk_obj = yf.Ticker(tk)
-                temp = tk_obj.history(period="max") # Usiamo history() che è più stabile
-                
+                temp = yf.download(tk, period="max", progress=False)
                 if not temp.empty:
-                    info = tk_obj.info
-                    names_dict[tk] = info.get("longName", tk)
-                    
-                    # Estrazione automatica del TER (Yahoo Finance lo salva in decimale, es. 0.0075 per 0.75%)
-                    if tk not in bench_tickers:
-                        fetched_ter = info.get('annualReportExpenseRatio')
-                        if fetched_ter is None:
-                            fetched_ter = info.get('expenseRatio')
-                        ter_dict[tk] = fetched_ter if fetched_ter is not None else 0.0
-                    
+                    names_dict[tk] = yf.Ticker(tk).info.get("longName", tk)
                     if isinstance(temp.columns, pd.MultiIndex):
                         temp.columns = temp.columns.droplevel(1)
                         
@@ -343,7 +330,9 @@ if st.session_state.run_analysis:
                         temp.index = temp.index.tz_localize(None)
                     temp.index = temp.index.normalize()
                         
-                    if "Close" in temp.columns:
+                    if "Adj Close" in temp.columns:
+                        df_dict[tk] = temp["Adj Close"].dropna()
+                    elif "Close" in temp.columns:
                         df_dict[tk] = temp["Close"].dropna()
                         
             if not df_dict:
@@ -361,19 +350,14 @@ if st.session_state.run_analysis:
             
             results = {}
             skipped_funds = []
-            missing_ter_funds = []
             
-            for raw_input in raw_inputs:
+            for raw_input, row_ter in zip(raw_inputs, valid_tickers["TER (%)"]):
                 t_resolved = fund_mapping[raw_input]
+                ter = row_ter / 100 if pd.notna(row_ter) else 0.0
                 
                 if t_resolved not in data.columns:
                     skipped_funds.append(f"**{raw_input}**: " + t("ISIN/Ticker not found in Yahoo Finance database.", "ISIN/Ticker non trovato nel database di Yahoo Finance."))
                     continue
-                    
-                # Pesca il TER estratto in automatico, oppure usa 0.0 come fallback
-                ter = ter_dict.get(t_resolved, 0.0)
-                if ter == 0.0:
-                    missing_ter_funds.append(raw_input)
                     
                 m = analyze_instrument(data[t_resolved], bench_data_df, ter, mode="RBSA" if "RBSA" in analysis_mode else "Direct")
                 
@@ -385,9 +369,6 @@ if st.session_state.run_analysis:
                     
             if skipped_funds:
                 st.warning(t("⚠️ **Some instruments were skipped:**\n", "⚠️ **Alcuni strumenti sono stati ignorati:**\n") + "\n".join([f"- {sf}" for sf in skipped_funds]))
-                
-            if missing_ter_funds:
-                st.info(t(f"ℹ️ **Note:** Yahoo Finance did not provide a TER for {', '.join(missing_ter_funds)}. It was temporarily assumed as 0.0%.", f"ℹ️ **Nota:** Yahoo Finance non ha fornito il TER per {', '.join(missing_ter_funds)}. È stato temporaneamente impostato allo 0.0%."))
                 
             if not results:
                 st.error(t("No valid instruments for analysis.", "Nessuno strumento valido per l'analisi."))
@@ -429,10 +410,7 @@ if "results" in st.session_state:
         
         st.subheader(t("Real-World Performance Profile", "Profilo di Performance Reale"))
         bench_desc = t("its real 'Shadow ETF'", "il suo 'Shadow ETF' reale") if "RBSA" in mode_used else t("your selected benchmark", "il benchmark selezionato")
-        
-        # MOSTRA IL TER USATO NEI DATI GENERALI
-        ter_display = f"{f_data['TER']*100:.2f}%" if f_data['TER'] > 0 else "0.0% (Not Found)"
-        st.markdown(t(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}. Evaluated TER: **{ter_display}**.", f"Dati storici validati dal **{f_data['Analysis Start']}**. Il fondo è stato analizzato contro {bench_desc}. TER calcolato: **{ter_display}**."))
+        st.markdown(t(f"Historical data validated since **{f_data['Analysis Start']}**. The fund was analyzed against {bench_desc}.", f"Dati storici validati dal **{f_data['Analysis Start']}**. Il fondo è stato analizzato contro {bench_desc}."))
         
         st.markdown("---")
         st.markdown(t("### 📊 Absolute Performance (Fund vs Benchmark)", "### 📊 Performance Assoluta (Fondo vs Benchmark)"))
