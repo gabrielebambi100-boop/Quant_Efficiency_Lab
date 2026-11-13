@@ -94,7 +94,7 @@ def get_retail_status(metric_name, value):
         return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    if r_squared > 0.80 and ter <= 0.02:
+    if r_squared > 0.80 and ter <= 0.005:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
     score = 50.0  
