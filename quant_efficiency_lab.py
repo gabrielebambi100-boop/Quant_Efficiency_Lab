@@ -94,7 +94,8 @@ def get_retail_status(metric_name, value):
         return "🟡", t("Coin Flip", "Lancio della Moneta"), t("Chances of beating the index over 3 years are near 50/50.", "Le probabilità di battere l'indice su 3 anni sono vicine al 50/50.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate):
-    if r_squared > 0.80 and ter <= 0.02:
+    # FIX: Tolleranza 0.005 (0.50%) per il TER per evitare che fondi attivi vengano presi per passivi
+    if r_squared > 0.80 and ter <= 0.005:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker. Excellent as a core portfolio engine.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente. Eccellente come motore base del portafoglio.")
 
     score = 50.0  
@@ -233,20 +234,20 @@ st.header(t("📦 Instruments to Evaluate", "📦 Strumenti da Valutare"))
 if is_it:
     with st.expander("💡 Spunti: Fondi famosi da testare"):
         st.markdown("""
-        Copia questi Ticker nella tabella sottostante per mettere alla prova l'algoritmo:
-        * 🟢 **I Pilastri Passivi:** `VT` (Total World), `SPY` (S&P 500). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
-        * 🟠 **I Colossi Attivi:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Fondi a gestione attiva storici e con enormi masse in gestione.*
-        * 🔴 **Le Scommesse Tematiche:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
-        * 🟡 **I Fondi da Dividendo:** `JEPI` (JPMorgan Equity Premium). *Molto popolari per la strategia basata sulla distribuzione di alte cedole.*
+        Copia questi Ticker e il loro TER nella tabella sottostante per mettere alla prova l'algoritmo:
+        * 🟢 **I Pilastri Passivi:** `VT` (TER: 0.07%), `SPY` (TER: 0.09%). *Tracker globali e statunitensi tra i più capitalizzati al mondo.*
+        * 🟠 **I Colossi Attivi:** `FCNTX` (TER: 0.77%), `AMCPX` (TER: 0.64%). *Fondi a gestione attiva storici e con enormi masse in gestione.*
+        * 🔴 **Le Scommesse Tematiche:** `ARKK` (TER: 0.75%), `ICLN` (TER: 0.40%). *Fondi ad alta volatilità legati a specifici settori o mega-trend.*
+        * 🟡 **I Fondi da Dividendo:** `JEPI` (TER: 0.35%). *Molto popolari per la strategia basata sulla distribuzione di alte cedole.*
         """)
 else:
     with st.expander("💡 Ideas: Famous Funds to test"):
         st.markdown("""
-        Copy these famous Tickers into the table below to stress-test the algorithm:
-        * 🟢 **The Passive Pillars:** `VT` (Total World), `SPY` (S&P 500). *Some of the most capitalized global and US trackers in the world.*
-        * 🟠 **The Active Giants:** `FCNTX` (Fidelity), `AMCPX` (American Funds). *Historical actively managed funds with massive AUM.*
-        * 🔴 **The Thematic Bets:** `ARKK` (Ark Innovation), `ICLN` (Clean Energy). *High-volatility funds tied to specific sectors or mega-trends.*
-        * 🟡 **The Dividend Funds:** `JEPI` (JPMorgan Equity Premium). *Highly popular for their high-yield income distribution strategies.*
+        Copy these famous Tickers and their TER into the table below to stress-test the algorithm:
+        * 🟢 **The Passive Pillars:** `VT` (TER: 0.07%), `SPY` (TER: 0.09%). *Some of the most capitalized global and US trackers in the world.*
+        * 🟠 **The Active Giants:** `FCNTX` (TER: 0.77%), `AMCPX` (TER: 0.64%). *Historical actively managed funds with massive AUM.*
+        * 🔴 **The Thematic Bets:** `ARKK` (TER: 0.75%), `ICLN` (TER: 0.40%). *High-volatility funds tied to specific sectors or mega-trends.*
+        * 🟡 **The Dividend Funds:** `JEPI` (TER: 0.35%). *Highly popular for their high-yield income distribution strategies.*
         """)
         
 df_input = pd.DataFrame({
@@ -519,6 +520,45 @@ if "results" in st.session_state:
             val_str = f"{f_data['Win Rate']*100:.1f}%" if f_data["Win Rate"] is not None else "N/A"
             st.metric(t("Rolling Win Rate", "Win Rate Rolling"), val_str)
             st.markdown(f"> **{t('Verdict', 'Verdetto')}:** {title}. {desc}")
+
+        # --- NUOVO GRAFICO: CAPITALE MANGIATO DAI COSTI ---
+        st.markdown("---")
+        st.markdown(t("### 💸 The Cost of Management (Capital Eaten by Fees)", "### 💸 Il Peso dei Costi (Capitale Mangiato)"))
+        st.markdown(t("<small>Shows how much of your wealth is silently eroded by the annual TER. The red area is the money that went to the fund manager instead of your pocket (based on a €10,000 initial investment).</small>", "<small>Mostra quanta ricchezza viene erosa silenziosamente dal TER annuo. L'area rossa sono i soldi finiti in tasca al gestore invece che nelle tue (simulazione su 10.000€ investiti).</small>"), unsafe_allow_html=True)
+        
+        initial_capital = 10000
+        # Calcola il rendimento lordo aggiungendo il TER spalmato giornalmente
+        f_gross_rets = f_data["F_Rets"] + (f_data["TER"] / 252)
+        
+        wealth_net = (1 + f_data["F_Rets"]).cumprod() * initial_capital
+        wealth_gross = (1 + f_gross_rets).cumprod() * initial_capital
+        lost_capital = wealth_gross.iloc[-1] - wealth_net.iloc[-1]
+        
+        fig_fees = go.Figure()
+        
+        fig_fees.add_trace(go.Scatter(
+            x=wealth_net.index, y=wealth_net, mode='lines', 
+            name=t('Net Wealth (Actual)', 'Capitale Netto (Reale)'),
+            line=dict(color='#34d399', width=2),
+            hovertemplate=t("Date: %{x}<br>Net: €%{y:,.0f}<extra></extra>", "Data: %{x}<br>Netto: €%{y:,.0f}<extra></extra>")
+        ))
+        
+        fig_fees.add_trace(go.Scatter(
+            x=wealth_gross.index, y=wealth_gross, mode='lines', 
+            name=t('Gross Wealth (No Fees)', 'Capitale Lordo (Senza Costi)'),
+            line=dict(color='#9ca3af', width=1, dash='dot'),
+            fill='tonexty', fillcolor='rgba(248, 113, 113, 0.4)',
+            hovertemplate=t("Date: %{x}<br>Gross: €%{y:,.0f}<extra></extra>", "Data: %{x}<br>Lordo: €%{y:,.0f}<extra></extra>")
+        ))
+        
+        fig_fees.update_layout(
+            template="plotly_dark", height=350, margin=dict(t=10, b=10, l=10, r=10), 
+            yaxis_tickformat=",.0f", hovermode="x unified",
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        )
+        
+        st.metric(t("Total Capital Eaten by Fees", "Capitale Totale Mangiato dai Costi"), f"- €{lost_capital:,.0f}")
+        st.plotly_chart(fig_fees, use_container_width=True)
 
         st.markdown("---")
         st.markdown(t("### 📅 Year-by-Year Performance", "### 📅 Performance Anno per Anno"))
