@@ -21,7 +21,6 @@ def resolve_ticker(query):
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         res = requests.get(url, params={"q": query}, headers=headers, timeout=5).json()
-        # Cerca preferibilmente ETF o Mutual Funds, altrimenti prende il primo simbolo
         for x in res.get("quotes", []):
             if x.get("quoteType") in ("ETF", "MUTUALFUND"):
                 return x["symbol"]
@@ -53,7 +52,6 @@ def calc_drawdown(wealth_index):
     return (wealth_index - peak) / peak
 
 def style_analysis(fund_rets, factors_rets):
-    """RBSA tramite Ottimizzazione Vincolata (Long-Only, Sum=1)"""
     num_factors = factors_rets.shape[1]
     init_weights = np.ones(num_factors) / num_factors
     bounds = tuple((0, 1) for _ in range(num_factors))
@@ -83,26 +81,23 @@ def get_retail_status(metric_name, value):
         return "🟢", t("True Protection", "Vera Protezione"), t("Anti-crisis fund, cuts market drawdowns.", "Fondo anti-crisi, taglia i crolli del mercato.")
 
 def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate, alpha_ann):
-    # Bypass per veri ETF Passivi (R2 altissimo, TER bassissimo)
     if r_squared > 0.90 and ter <= 0.005:
         return 85.0, "P", t("🔵 PASSIVE ETF: Honest and efficient tracker.", "🔵 ETF PASSIVO: Tracker onesto ed efficiente.")
 
     score = 50.0  
     score += ir * 20 
     
-    # FIX BUG CLAUDE #1: Il P-Value premia SOLO se l'Alpha è positivo!
+
     if alpha_ann > 0:
         if p_value <= 0.05: score += 15
         elif p_value > 0.10: score -= 5
     else:
-        # Se l'Alpha è negativo e statisticamente significativo, è un disastro!
         if p_value <= 0.05: score -= 15
         elif p_value > 0.10: score -= 5
     
     if down_cap > 1.0: score -= 10
     elif down_cap < 0.80: score += 10
     
-    # Clamp per evitare penalizzazioni folli sui closet indexers
     capped_active_fee = min(active_fee, 0.05)
     if capped_active_fee > 0.04: score -= 15 
     
@@ -123,9 +118,8 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     df = pd.concat([fund_prices, bench_data_df], axis=1).dropna()
     if len(df) < 252: return None
     
-    # Rendimenti logaritmici per maggiore stabilità
-    f_rets = np.log(df.iloc[:, 0] / df.iloc[:, 0].shift(1)).dropna()
-    bench_rets_raw = np.log(df.iloc[:, 1:] / df.iloc[:, 1:].shift(1)).dropna()
+    f_rets = df.iloc[:, 0].pct_change().dropna()
+    bench_rets_raw = df.iloc[:, 1:].pct_change().dropna()
     
     if mode == "RBSA":
         f_rets_weekly = df.iloc[:, 0].resample('W').last().pct_change().dropna()
@@ -140,7 +134,6 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         weight_dict = {"Global Equity": 1.0, "Bonds": 0.0, "Cash / Liquidity": 0.0}
         dynamic_rf_rate_daily = 0.02 / 252
 
-    # FIX BUG CLAUDE #3: Annualizzazione coerente basata sui rendimenti geometrici
     n_days = len(f_rets)
     ann_ret = (1 + f_rets).prod() ** (252 / n_days) - 1
     b_ann_ret = (1 + pd.Series(synthetic_bench_rets)).prod() ** (252 / n_days) - 1
@@ -148,13 +141,11 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     excess_f = f_rets - dynamic_rf_rate_daily
     excess_b = synthetic_bench_rets - dynamic_rf_rate_daily
     
-    # Regressione OLS
     reg_result = stats.linregress(excess_b, excess_f)
     intercept = reg_result.intercept
     alpha_ann = intercept * 252
     r_squared = reg_result.rvalue**2
 
-    # Clamp sull'Active Fee per non farla esplodere
     active_share_proxy = max(1 - r_squared, 0.05) 
     active_fee = ter / active_share_proxy
     
@@ -170,7 +161,6 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     b_wealth_index = (1 + pd.Series(synthetic_bench_rets)).cumprod()
     b_max_dd = calc_drawdown(b_wealth_index).min()
 
-    # FIX BUG CLAUDE #1: P-Value Robust
     n = len(excess_b)
     if hasattr(reg_result, 'intercept_stderr') and reg_result.intercept_stderr > 0:
         t_stat_alpha = intercept / reg_result.intercept_stderr
@@ -178,7 +168,6 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
     else:
         p_value_alpha = 1.0
     
-    # FIX BUG CLAUDE #4: Down Capture coerente con lo Shadow Benchmark, non con la colonna equity
     down_mask = synthetic_bench_rets < 0
     if synthetic_bench_rets[down_mask].mean() < 0:
         down_cap = f_rets[down_mask].mean() / synthetic_bench_rets[down_mask].mean()
@@ -217,7 +206,7 @@ def analyze_instrument(fund_prices, bench_data_df, ter, mode):
         "Win Rate": win_rate,
         "Rolling Alpha": rolling_alpha,
         "Analysis Start": df.index[0].strftime('%Y-%m-%d'),
-        "F_Rets": f_monthly, # Salviamo i mensili per alleggerire plotly 
+        "F_Rets": f_monthly, 
         "B_Rets": b_monthly
     }
 
@@ -230,7 +219,7 @@ st.header(t("📦 Evaluate Instruments", "📦 Strumenti da Valutare"))
 if is_it:
     with st.expander("💡 Spunti: Fondi famosi da testare"):
         st.markdown("""
-        Copia questi Ticker nella tabella sottostante:
+        Copia questi Ticker e il loro TER nella tabella sottostante:
         * 🟢 **Pilastri Passivi:** `VT` (0.07%), `SPY` (0.09%).
         * 🟠 **Colossi Attivi:** `FCNTX` (0.77%), `AMCPX` (0.64%).
         * 🔴 **Scommesse Tematiche:** `ARKK` (0.75%), `ICLN` (0.40%).
@@ -239,7 +228,7 @@ if is_it:
 else:
     with st.expander("💡 Ideas: Famous Funds to test"):
         st.markdown("""
-        Copy these Tickers into the table below:
+        Copy these Tickers and their TER into the table below:
         * 🟢 **Passive Pillars:** `VT` (0.07%), `SPY` (0.09%).
         * 🟠 **Active Giants:** `FCNTX` (0.77%), `AMCPX` (0.64%).
         * 🔴 **Thematic Bets:** `ARKK` (0.75%), `ICLN` (0.40%).
@@ -296,12 +285,10 @@ if st.session_state.run_analysis:
             names_dict = {}
             df_dict = {}
             
-            # Unica chiamata a YF per performance (Consiglio Claude #5)
-            # YF scarica meglio tutto in blocco
             raw_data = yf.download(all_t, period="max", progress=False)
             
             for tk in all_t:
-                names_dict[tk] = tk # YF bulk download perde i nomi lunghi, teniamo il ticker pulito
+                names_dict[tk] = tk 
                 
                 if "Adj Close" in raw_data.columns:
                     col_data = raw_data["Adj Close"][tk] if len(all_t) > 1 else raw_data["Adj Close"]
@@ -380,7 +367,6 @@ if "results" in st.session_state:
         st.markdown(f"""<div style="background-color: {box_color}; padding: 15px; border-radius: 10px; border: 1px solid {text_color}; margin-bottom: 25px;">
             <h4 style="color: {text_color}; margin: 0;">{score_verdict}</h4></div>""", unsafe_allow_html=True)
         
-        # METRICHE PRINCIPALI IN 3 COLONNE (Miglioramento UI Claude)
         c1, c2, c3 = st.columns(3)
         icon_f, title_f, desc_f = get_retail_status("Fotocopia", f_data["R² vs Benchmark"])
         with c1:
@@ -428,6 +414,43 @@ if "results" in st.session_state:
                 fig_donut.update_layout(template="plotly_dark", height=200, margin=dict(t=0, b=0, l=0, r=0), showlegend=False)
                 st.plotly_chart(fig_donut, use_container_width=True)
 
+        # --- GRAFICO COSTI ---
+        st.markdown("---")
+        st.markdown(t("### 💸 The Cost of Management (Capital Eaten by Fees)", "### 💸 Il Peso dei Costi (Capitale Mangiato)"))
+        
+        initial_capital = 10000
+        f_monthly = f_data["F_Rets"]
+        b_monthly = f_data["B_Rets"]
+        
+        ter_monthly = f_data["TER"] / 12
+        f_gross_rets = f_monthly + ter_monthly
+        
+        wealth_net = (1 + f_monthly).cumprod() * initial_capital
+        wealth_gross = (1 + f_gross_rets).cumprod() * initial_capital
+        lost_capital = wealth_gross.iloc[-1] - wealth_net.iloc[-1]
+        
+        fig_fees = go.Figure()
+        fig_fees.add_trace(go.Scatter(x=wealth_net.index, y=wealth_net, mode='lines', name=t('Net Wealth (Actual)', 'Capitale Netto (Reale)'), line=dict(color='#34d399', width=2)))
+        fig_fees.add_trace(go.Scatter(x=wealth_gross.index, y=wealth_gross, mode='lines', name=t('Gross Wealth (No Fees)', 'Capitale Lordo (Senza Costi)'), line=dict(color='#9ca3af', width=1, dash='dot'), fill='tonexty', fillcolor='rgba(248, 113, 113, 0.4)'))
+        fig_fees.update_layout(template="plotly_dark", height=350, margin=dict(t=10, b=10, l=10, r=10), yaxis_tickformat=",.0f", hovermode="x unified", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+        
+        st.metric(t("Total Capital Eaten by Fees", "Capitale Totale Mangiato dai Costi"), f"- €{lost_capital:,.0f}")
+        st.plotly_chart(fig_fees, use_container_width=True)
+
+        # --- GRAFICO ANNI SOLARI ---
+        st.markdown("---")
+        st.markdown(t("### 📅 Year-by-Year Performance", "### 📅 Performance Anno per Anno"))
+        
+        f_yearly = f_monthly.resample('YE').apply(lambda x: (1+x).prod()-1)
+        b_yearly = b_monthly.resample('YE').apply(lambda x: (1+x).prod()-1)
+        years = f_yearly.index.year
+        
+        fig_yearly = go.Figure()
+        fig_yearly.add_trace(go.Bar(x=years, y=f_yearly, name=t('Fund', 'Fondo'), marker_color=np.where(f_yearly >= 0, '#34d399', '#f87171')))
+        fig_yearly.add_trace(go.Bar(x=years, y=b_yearly, name='Shadow Benchmark', marker_color='#9ca3af', opacity=0.6))
+        fig_yearly.update_layout(template="plotly_dark", height=350, barmode='group', margin=dict(t=30, b=10, l=10, r=10), yaxis_tickformat=".1%", xaxis=dict(type='category'), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+        st.plotly_chart(fig_yearly, use_container_width=True)
+
     with tab_quant:
         st.subheader(t("Econometric Metrics", "Metriche Econometriche"))
         df_q = pd.DataFrame({
@@ -438,34 +461,40 @@ if "results" in st.session_state:
         })
         st.dataframe(df_q, hide_index=True, use_container_width=True)
             
+        # --- SCATTER PLOT ---
         st.markdown("---")
         st.markdown(t("#### 📉 Regression Scatter", "#### 📉 Regressione Lineare"))
-        m, b = np.polyfit(f_data["B_Rets"], f_data["F_Rets"], 1)
-        trendline_x = np.array([f_data["B_Rets"].min(), f_data["B_Rets"].max()])
+        m, b = np.polyfit(b_monthly, f_monthly, 1)
+        trendline_x = np.array([b_monthly.min(), b_monthly.max()])
         trendline_y = m * trendline_x + b
 
         fig_scatter = go.Figure()
-        fig_scatter.add_trace(go.Scatter(x=f_data["B_Rets"], y=f_data["F_Rets"], mode='markers', marker=dict(color='#3B82F6', size=6, opacity=0.6)))
+        fig_scatter.add_trace(go.Scatter(x=b_monthly, y=f_monthly, mode='markers', marker=dict(color='#3B82F6', size=6, opacity=0.6)))
         fig_scatter.add_trace(go.Scatter(x=trendline_x, y=trendline_y, mode='lines', line=dict(color='#F87171', width=2, dash='dot')))
         fig_scatter.update_layout(template="plotly_dark", height=400, margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
         fig_scatter.add_vline(x=0, line_width=1, line_color="rgba(255,255,255,0.2)")
         fig_scatter.add_hline(y=0, line_width=1, line_color="rgba(255,255,255,0.2)")
         st.plotly_chart(fig_scatter, use_container_width=True)
 
+        # --- ROLLING ALPHA ---
         st.markdown("---")
         st.markdown(t("#### 🔄 3-Year Rolling Alpha", "#### 🔄 Alpha Rolling a 3 Anni"))
         rolling_alpha = f_data.get("Rolling Alpha")
         if rolling_alpha is not None and not rolling_alpha.empty:
             fig_roll = go.Figure()
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.clip(lower=0), mode='lines', line=dict(width=0), fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)'
-            ))
-            fig_roll.add_trace(go.Scatter(
-                x=rolling_alpha.index, y=rolling_alpha.clip(upper=0), mode='lines', line=dict(width=0), fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)'
-            ))
+            fig_roll.add_trace(go.Scatter(x=rolling_alpha.index, y=rolling_alpha.clip(lower=0), mode='lines', line=dict(width=0), fill='tozeroy', fillcolor='rgba(52, 211, 153, 0.4)'))
+            fig_roll.add_trace(go.Scatter(x=rolling_alpha.index, y=rolling_alpha.clip(upper=0), mode='lines', line=dict(width=0), fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.4)'))
             fig_roll.update_layout(template="plotly_dark", height=300, margin=dict(t=10, b=10, l=10, r=10), showlegend=False, yaxis_tickformat=".1%")
             fig_roll.add_hline(y=0, line_width=1, line_dash="dash", line_color="rgba(255,255,255,0.5)")
             st.plotly_chart(fig_roll, use_container_width=True)
         else:
             st.info("No data.")
+            
+        # --- HISTOGRAM ---
+        st.markdown("---")
+        st.markdown(t("#### 📊 Return Distribution (Tails & Skewness)", "#### 📊 Distribuzione dei Rendimenti (Asimmetria e Code)"))
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(x=f_monthly, name=t('Fund', 'Fondo'), marker_color='#34d399', opacity=0.7, nbinsx=50))
+        fig_hist.add_trace(go.Histogram(x=b_monthly, name='Shadow Benchmark', marker_color='#9ca3af', opacity=0.5, nbinsx=50))
+        fig_hist.update_layout(template="plotly_dark", height=350, barmode='overlay', margin=dict(t=10, b=10, l=10, r=10), xaxis_tickformat=".1%", legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99))
         st.plotly_chart(fig_hist, use_container_width=True)
