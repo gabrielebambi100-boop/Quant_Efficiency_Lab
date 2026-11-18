@@ -12,21 +12,27 @@ import re
 ISIN_REGEX = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}\d$")
 
 @st.cache_data(ttl=3600)
-def resolve_ticker(query):
-    """Traduzione robusta da ISIN a Ticker tramite Yahoo Search"""
-    if not ISIN_REGEX.match(query.upper()): 
-        return query
-    
-    url = "https://query2.finance.yahoo.com/v1/finance/search"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+def fetch_price_series(ticker):
     try:
-        res = requests.get(url, params={"q": query}, headers=headers, timeout=5).json()
-        for x in res.get("quotes", []):
-            if x.get("quoteType") in ("ETF", "MUTUALFUND"):
-                return x["symbol"]
-        return next((x["symbol"] for x in res.get("quotes", [])), query)
-    except:
-        return query
+        tk_obj = yf.Ticker(ticker)
+        hist = tk_obj.history(period="max", auto_adjust=True)
+        if hist.empty or "Close" not in hist.columns:
+            return pd.Series(dtype=float), ticker
+        
+        s = hist["Close"].dropna()
+        if s.index.tz is not None:
+            s.index = s.index.tz_localize(None)
+        s.index = s.index.normalize()
+        s = s[~s.index.duplicated(keep='last')]
+        
+        try:
+            name = tk_obj.info.get("shortName") or tk_obj.info.get("longName") or ticker
+        except Exception:
+            name = ticker
+            
+        return s, name
+    except Exception:
+        return pd.Series(dtype=float), ticker
 
 st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
@@ -288,20 +294,15 @@ if st.session_state.run_analysis:
             raw_data = yf.download(all_t, period="max", progress=False)
             
             for tk in all_t:
-                names_dict[tk] = tk 
-                
-                if "Adj Close" in raw_data.columns:
-                    col_data = raw_data["Adj Close"][tk] if len(all_t) > 1 else raw_data["Adj Close"]
-                else:
-                    col_data = raw_data["Close"][tk] if len(all_t) > 1 else raw_data["Close"]
-                
-                temp = pd.DataFrame(col_data.dropna())
-                temp.columns = [tk]
-                
-                if temp.index.tz is not None: temp.index = temp.index.tz_localize(None)
-                temp.index = temp.index.normalize()
-                df_dict[tk] = temp[tk]
-                        
+                s, long_name = fetch_price_series(tk)
+                names_dict[tk] = long_name
+                if not s.empty:
+                    df_dict[tk] = s
+
+            if not df_dict:
+                st.error(t("❌ No data found from Yahoo Finance.", "❌ Nessun dato ricevuto da Yahoo Finance."))
+                st.stop()
+
             data = pd.DataFrame(df_dict)
             
             missing_bench = [tk for tk in bench_tickers if tk not in data.columns]
