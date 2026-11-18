@@ -8,11 +8,33 @@ from scipy.optimize import minimize
 import requests
 import re
 
+st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
+
 # Regex per identificare un ISIN
 ISIN_REGEX = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}\d$")
 
 @st.cache_data(ttl=3600)
+def resolve_ticker(query):
+    """Traduzione robusta da ISIN a Ticker tramite Yahoo Finance Search"""
+    q = str(query).strip().upper()
+    if not ISIN_REGEX.match(q):
+        return q
+    
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        res = requests.get(url, params={"q": q}, headers=headers, timeout=5).json()
+        quotes = res.get("quotes", [])
+        for x in quotes:
+            if x.get("quoteType") in ("ETF", "MUTUALFUND"):
+                return x["symbol"]
+        return next((x["symbol"] for x in quotes if "symbol" in x), q)
+    except Exception:
+        return q
+
+@st.cache_data(ttl=3600)
 def fetch_price_series(ticker):
+    """Scarica un singolo ticker, rimuove il fuso orario e restituisce (Serie prezzi, Nome)"""
     try:
         tk_obj = yf.Ticker(ticker)
         hist = tk_obj.history(period="max", auto_adjust=True)
@@ -33,8 +55,6 @@ def fetch_price_series(ticker):
         return s, name
     except Exception:
         return pd.Series(dtype=float), ticker
-
-st.set_page_config(page_title="Quant Efficiency Lab", layout="wide", page_icon="🔬")
 
 hide_st_style = """
             <style>
@@ -93,7 +113,6 @@ def get_global_score(ir, p_value, down_cap, active_fee, r_squared, ter, win_rate
     score = 50.0  
     score += ir * 20 
     
-
     if alpha_ann > 0:
         if p_value <= 0.05: score += 15
         elif p_value > 0.10: score -= 5
@@ -247,11 +266,7 @@ df_input = pd.DataFrame({
 })
 edited_df = st.data_editor(df_input, num_rows="dynamic", use_container_width=True)
 
-if st.button(t("Run Analysis", "Avvia Analisi"), type="primary", use_container_width=True):
-    st.session_state.run_analysis = True
-else:
-    if "run_analysis" not in st.session_state:
-        st.session_state.run_analysis = False
+run_btn = st.button(t("Run Analysis", "Avvia Analisi"), type="primary", use_container_width=True)
 
 # SIDEBAR
 with st.sidebar:
@@ -278,20 +293,20 @@ with st.sidebar:
     st.caption(t("🚨 **Methodology Disclaimer:** Historical data evaluated via OLS Regression and SLSQP Optimization. Past performance does not guarantee future results. Educational tool only.", "🚨 **Disclaimer Metodologico:** Dati storici valutati tramite Regressione OLS e ottimizzazione SLSQP. I rendimenti passati non garantiscono risultati futuri. Solo a scopo educativo."))
 
 # ESECUZIONE
-if st.session_state.run_analysis:
+if run_btn:
     valid_tickers = edited_df.dropna(subset=["Ticker"]).copy()
-    raw_inputs = valid_tickers["Ticker"].str.strip().tolist()
+    valid_tickers["Ticker"] = valid_tickers["Ticker"].astype(str).str.strip().str.upper()
+    valid_tickers = valid_tickers[valid_tickers["Ticker"] != ""]
+    raw_inputs = valid_tickers["Ticker"].tolist()
     
     with st.spinner(t("Fetching data & computing...", "Download dati e calcolo quantitativo in corso...")):
         try:
             fund_mapping = {raw: resolve_ticker(raw) for raw in raw_inputs}
-            bench_tickers = [resolve_ticker(t) for t in target_bench_tickers]
+            bench_tickers = [resolve_ticker(tk) for tk in target_bench_tickers]
             
             all_t = list(set(list(fund_mapping.values()) + bench_tickers))
             names_dict = {}
             df_dict = {}
-            
-            raw_data = yf.download(all_t, period="max", progress=False)
             
             for tk in all_t:
                 s, long_name = fetch_price_series(tk)
@@ -326,7 +341,7 @@ if st.session_state.run_analysis:
                 
                 if m:
                     results[raw_input] = m
-                    names_dict[raw_input] = t_resolved
+                    names_dict[raw_input] = names_dict.get(t_resolved, t_resolved)
                 else:
                     skipped_funds.append(f"**{raw_input}** (Time series < 1 year)")
                     
@@ -350,8 +365,14 @@ if "results" in st.session_state:
     mode_used = st.session_state.get("mode", "🤖 Shadow ETF (RBSA)")
     
     st.divider()
-    selected_t = st.selectbox(t("Select instrument:", "Seleziona strumento:"), list(res.keys()), format_func=lambda x: f"{names.get(x, x)}")
+    selected_t = st.selectbox(
+        t("Select instrument:", "Seleziona strumento:"),
+        list(res.keys()),
+        format_func=lambda x: f"{names.get(x, x)} ({x})"
+    )
     f_data = res[selected_t]
+    f_monthly = f_data["F_Rets"]
+    b_monthly = f_data["B_Rets"]
     
     tab_retail, tab_quant = st.tabs([t("👨‍💼 Retail Dashboard", "👨‍💼 Dashboard Retail"), t("🔬 Quant Lab", "🔬 Lab Quantitativo")])
     
@@ -384,7 +405,7 @@ if "results" in st.session_state:
             st.metric(t("Downside Capture", "Cattura Ribassi (Airbag)"), f"{f_data['Down Capture']*100:.1f}%")
             st.caption(f"{icon_a} **{title_a}**")
 
-        if len(f_data['F_Rets']) < 36:
+        if len(f_monthly) < 36:
             st.warning(t("⚠️ **Short Track Record:** Less than 3 years of data.", "⚠️ **Storico Breve:** Meno di 3 anni di dati."))
 
         st.markdown("---")
@@ -420,9 +441,6 @@ if "results" in st.session_state:
         st.markdown(t("### 💸 The Cost of Management (Capital Eaten by Fees)", "### 💸 Il Peso dei Costi (Capitale Mangiato)"))
         
         initial_capital = 10000
-        f_monthly = f_data["F_Rets"]
-        b_monthly = f_data["B_Rets"]
-        
         ter_monthly = f_data["TER"] / 12
         f_gross_rets = f_monthly + ter_monthly
         
