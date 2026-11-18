@@ -339,7 +339,18 @@ run_btn = st.button(t("Run Analysis", "Avvia Analisi"), type="primary", use_cont
 with st.sidebar:
     st.header(t("⚙️ Engine Specs", "⚙️ Motore di Analisi"))
 
-    currency_preset = st.selectbox(t("Currency / Region", "Valuta / Area Geografica"), ["🇺🇸 USD (Default)", "🇪🇺 EUR (UCITS)"])
+    currency_preset = st.selectbox(
+        t("Currency / Region", "Valuta / Area Geografica"),
+        ["🇺🇸 USD (Default)", "🇪🇺 EUR (UCITS)"],
+    )
+
+    st.warning(
+        t(
+            "⚠️ **Currency Reminder:** Default is **USD**. If you are analyzing European funds/ETFs (UCITS), switch to **EUR** above. **Never mix US and European funds** in the same analysis: FX noise and different market close times will distort Alpha, R², and Tracking Error.",
+            "⚠️ **Promemoria Valuta:** Il default è **USD**. Se analizzi fondi o ETF europei (UCITS), cambia subito in **EUR** qui sopra. **Non mischiare mai fondi americani ed europei** nella stessa analisi: il rumore di cambio e gli orari di chiusura diversi falsano Alpha, R² e Tracking Error.",
+        )
+    )
+
     if "USD" in currency_preset:
         def_eq, def_bd, def_cs = "VT", "AGG", "BIL"
     else:
@@ -360,6 +371,40 @@ with st.sidebar:
         target_bench_tickers = [single_bench.strip().upper()]
 
     st.markdown("---")
+
+    if is_it:
+        with st.expander("📐 Come funziona l'OLS e limiti del modello"):
+            st.markdown("""
+            **Cos'è la regressione OLS (Ordinary Least Squares):**
+            Il motore stima la relazione lineare tra gli extra-rendimenti giornalieri del fondo e quelli del benchmark (Shadow ETF o Indice Singolo):
+            - **Beta (pendenza):** sensibilità del fondo ai movimenti del benchmark.
+            - **Alpha (intercetta):** extra-rendimento puro annualizzato non spiegato dal benchmark.
+            - **R²:** quota della varianza del fondo spiegata dal benchmark.
+            - **P-Value:** verifica statistica (test $t$) se l'Alpha è significativamente diverso da zero.
+
+            **Limiti da tenere a mente:**
+            - **Strategie non lineari / convesse:** l'OLS assume esposizione lineare e simmetrica. Strategie come Managed Futures, Trend-Following o coperture Tail Risk rompono il modello.
+            - **Leva e Capital Efficiency:** l'ottimizzatore RBSA è vincolato *long-only* (pesi $\ge 0$, somma = 100%) e non può replicare portafogli a leva implicita o Return Stacking (es. 90/60).
+            - **Fondi fattoriali puri:** con soli 3 proxy (Azioni, Bond, Cash), l'Alpha può includere esposizione a fattori (es. Small Cap Value, Momentum). Per isolare l'abilità del gestore, usa **Indice Singolo** contro un ETF passivo dello stesso stile.
+            - **Dati giornalieri e P-Value:** i rendimenti finanziari hanno code grasse e cluster di volatilità; il P-Value OLS standard è un'indicazione utile ma non una prova definitiva.
+            """)
+    else:
+        with st.expander("📐 How OLS works & Model Limitations"):
+            st.markdown("""
+            **What OLS (Ordinary Least Squares) does:**
+            The engine fits a linear regression between the fund's daily excess returns and the benchmark's excess returns (Shadow ETF or Direct Index):
+            - **Beta (slope):** sensitivity of the fund to benchmark movements.
+            - **Alpha (intercept):** annualized excess return not explained by the benchmark.
+            - **R²:** share of the fund's return variance explained by the benchmark.
+            - **P-Value:** statistical $t$-test checking whether Alpha is significantly different from zero.
+
+            **Key Limitations:**
+            - **Non-linear / Convex strategies:** OLS assumes linear, symmetrical market exposure. Managed Futures, Trend-Following, or Tail-Risk hedging strategies will break the model.
+            - **Leverage & Capital Efficiency:** The RBSA optimizer is *long-only* (weights $\ge 0$, sum = 100%) and cannot replicate implicitly leveraged or Return Stacked funds (e.g., 90/60).
+            - **Pure Factor Funds:** With only 3 macro proxies (Equity, Bonds, Cash), Alpha may reflect factor tilts (e.g., Small Cap Value, Momentum). To isolate pure manager skill, switch to **Direct Index** against a style-matched passive ETF.
+            - **Daily Data & P-Value:** Financial returns exhibit fat tails and volatility clustering; standard OLS P-Values are a strong diagnostic signal, not absolute proof.
+            """)
+
     st.caption(
         t(
             "🚨 **Methodology Disclaimer:** Historical data evaluated via OLS Regression and SLSQP Optimization. Past performance does not guarantee future results. Educational tool only.",
